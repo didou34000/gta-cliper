@@ -1,6 +1,6 @@
 import { PageHead, Panel, type Ctx } from "../ctx";
 import { GAMES, REPO, STREAMERS } from "@/lib/launch";
-import { bufferReady } from "@/lib/buffer";
+import { bufferReady, publishEnabled } from "@/lib/buffer";
 import { AUTO_OPTIONS, EVERY_OPTIONS, HOURS_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS } from "@/lib/schedule";
 import { ago, fmtHours, fmtMin, hhmm } from "@/lib/format";
 
@@ -32,8 +32,9 @@ function GameSelect({ value }: { value?: string }) {
   );
 }
 
-export default function ProgView({ ctx, launch, prog }: { ctx: Ctx; launch?: string; prog?: string }) {
+export default async function ProgView({ ctx, launch, prog }: { ctx: Ctx; launch?: string; prog?: string }) {
   const { schedule, state, lastRun, nextRun } = ctx;
+  const pubOn = bufferReady() && (await publishEnabled());
 
   return (
     <>
@@ -48,6 +49,24 @@ export default function ProgView({ ctx, launch, prog }: { ctx: Ctx; launch?: str
         </p>
       )}
       {prog === "ok" && <p className="banner banner-ok">Réglage enregistré. Il est pris en compte au prochain contrôle (toutes les 20 min).</p>}
+
+      <Panel title="Publication sur TikTok et YouTube">
+        <form method="post" action="/api/publish-toggle" className="form-grid">
+          <fieldset>
+            <legend>Publication auto via Buffer</legend>
+            <span className={pubOn ? "" : "muted"}>
+              {!bufferReady() ? "Clé Buffer manquante sur Vercel : rien ne peut partir."
+                : pubOn ? `🟢 Allumée : les clips « À poster » partent tout seuls, un toutes les ${fmtMin(schedule.publish_every_min)}.`
+                : "⚪ Coupée : rien ne part, les clips validés attendent dans « À poster »."}
+            </span>
+          </fieldset>
+          {bufferReady() && (
+            <button type="submit" name="enabled" value={pubOn ? "off" : "on"} className={pubOn ? "btn ghost" : "btn-launch"}>
+              {pubOn ? "Couper la publication" : "Allumer la publication"}
+            </button>
+          )}
+        </form>
+      </Panel>
 
       <Panel title="Lancer un passage maintenant">
         <form method="post" action="/api/launch" className="form-grid">
@@ -130,8 +149,9 @@ export default function ProgView({ ctx, launch, prog }: { ctx: Ctx; launch?: str
             <select name="publish_every_min" defaultValue={String(schedule.publish_every_min)}>
               {PUBLISH_OPTIONS.map((n) => <option key={n} value={n}>{fmtMin(n)}</option>)}
             </select>
-            <span className="muted small">{bufferReady()
+            <span className="muted small">{pubOn
               ? "Chaque clip validé part tout seul via Buffer, espacé de ce délai (10 programmés max)."
+              : bufferReady() ? "Utilisé quand la publication auto est allumée (en haut de la page)."
               : "Publication auto pas encore branchée (clé Buffer manquante)."}</span>
           </fieldset>
           <fieldset>
