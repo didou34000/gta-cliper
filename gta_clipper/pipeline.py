@@ -32,6 +32,8 @@ def load_config(path: str | Path = "config.yaml") -> dict:
     apply_launch_overrides(cfg, os.environ)
     if (os.environ.get("MIN_VIEWS") or "").isdigit():
         cfg["min_clip_views"] = int(os.environ["MIN_VIEWS"])
+    if (os.environ.get("HOURS") or "").isdigit():
+        cfg["lookback_hours"] = max(1, min(720, int(os.environ["HOURS"])))
     return cfg
 
 

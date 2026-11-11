@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { REPO, WORKFLOW } from "@/lib/launch";
+import { HOURS_OPTIONS } from "@/lib/schedule";
 
 // Lance un passage du bot sur GitHub Actions avec le jeu et les streamers choisis.
 // Le jeton GH_DISPATCH_TOKEN (Vercel) n'a que le droit « Actions » sur le dépôt.
@@ -25,6 +26,8 @@ export async function POST(req: Request) {
 
   const minViews = [20, 50, 100, 200, 500, 1000, 5000].includes(parseInt(String(f.get("min_views")), 10))
     ? String(parseInt(String(f.get("min_views")), 10)) : "200";
+  const h = parseInt(String(f.get("hours")), 10);
+  const hours = String(HOURS_OPTIONS.includes(h) ? h : 48);
   const n = Math.min(10, Math.max(1, parseInt(String(f.get("max_clips") ?? "3"), 10) || 3));
 
   const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/dispatches`, {
@@ -35,7 +38,7 @@ export async function POST(req: Request) {
       "X-GitHub-Api-Version": "2022-11-28",
       "User-Agent": "gta-clipper-site",
     },
-    body: JSON.stringify({ ref: "main", inputs: { jeu, top_streamers: String(top), streamers: uniq.join(","), max_clips: String(n), min_views: minViews } }),
+    body: JSON.stringify({ ref: "main", inputs: { jeu, top_streamers: String(top), streamers: uniq.join(","), max_clips: String(n), min_views: minViews, heures: hours } }),
     cache: "no-store",
   });
   if (!r.ok) {

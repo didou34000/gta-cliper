@@ -24,6 +24,9 @@ on:
       min_views:
         description: "Vues minimum d'un clip Twitch pour être pris"
         default: "200"
+      heures:
+        description: "Chercher les clips des N dernières heures (1 à 720)"
+        default: "48"
 
 permissions:
   contents: read
@@ -38,6 +41,7 @@ jobs:
       top: ${{ steps.plan.outputs.top }}
       max_clips: ${{ steps.plan.outputs.max_clips }}
       min_views: ${{ steps.plan.outputs.min_views }}
+      heures: ${{ steps.plan.outputs.heures }}
     steps:
       - uses: actions/checkout@v4
         if: github.event_name == 'schedule'
@@ -49,11 +53,12 @@ jobs:
           IN_TOP: ${{ inputs.top_streamers }}
           IN_MAX: ${{ inputs.max_clips }}
           IN_MIN: ${{ inputs.min_views }}
+          IN_HEURES: ${{ inputs.heures }}
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
             python3 -m gta_clipper.schedule
           else
-            { echo "run=true"; echo "jeu=$IN_JEU"; echo "top=${IN_TOP:-8}"; echo "max_clips=${IN_MAX:-3}"; echo "min_views=${IN_MIN:-200}"; } >> "$GITHUB_OUTPUT"
+            { echo "run=true"; echo "jeu=$IN_JEU"; echo "top=${IN_TOP:-8}"; echo "max_clips=${IN_MAX:-3}"; echo "min_views=${IN_MIN:-200}"; echo "heures=${IN_HEURES:-48}"; } >> "$GITHUB_OUTPUT"
           fi
 
   run:
@@ -76,6 +81,7 @@ jobs:
       STREAMERS: ${{ inputs.streamers }}
       MAX_CLIPS: ${{ needs.check.outputs.max_clips || '3' }}
       MIN_VIEWS: ${{ needs.check.outputs.min_views || '200' }}
+      HOURS: ${{ needs.check.outputs.heures || '48' }}
       WHISPER_DEVICE: cpu
       WHISPER_COMPUTE: int8
       FONTCONFIG_FILE: /etc/fonts/fonts.conf   # pour le ffmpeg statique

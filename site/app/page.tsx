@@ -3,7 +3,7 @@ import CopyPost from "./CopyPost";
 import AutoRefresh from "./AutoRefresh";
 import { loadClips, loadHeartbeat, type Clip, type Status } from "@/lib/data";
 import { GAMES, REPO, STREAMERS } from "@/lib/launch";
-import { EVERY_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS, loadSchedule } from "@/lib/schedule";
+import { EVERY_OPTIONS, HOURS_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS, loadSchedule } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +45,18 @@ function ViewsSelect({ value }: { value: number }) {
   return (
     <select name="min_views" defaultValue={String(value)}>
       {VIEWS_OPTIONS.map((n) => <option key={n} value={n}>{n.toLocaleString("fr-FR")} vues</option>)}
+    </select>
+  );
+}
+
+function fmtHours(h: number) {
+  return h < 48 || h % 24 !== 0 ? `${h} dernières heures` : `${h / 24} derniers jours (${h} h)`;
+}
+
+function HoursSelect({ value }: { value: number }) {
+  return (
+    <select name="hours" defaultValue={String(value)}>
+      {HOURS_OPTIONS.map((n) => <option key={n} value={n}>{fmtHours(n)}</option>)}
     </select>
   );
 }
@@ -141,6 +153,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
             <legend>Vues minimum par clip</legend>
             <ViewsSelect value={200} />
           </fieldset>
+          <fieldset>
+            <legend>Clips créés dans les</legend>
+            <HoursSelect value={48} />
+          </fieldset>
           <button type="submit" className="btn-launch" disabled={state === "running"}>
             {state === "running" ? "Un passage est déjà en cours" : "Lancer"}
           </button>
@@ -187,6 +203,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
           <fieldset>
             <legend>Vues minimum par clip</legend>
             <ViewsSelect value={schedule.min_views} />
+          </fieldset>
+          <fieldset>
+            <legend>Clips créés dans les</legend>
+            <HoursSelect value={schedule.hours} />
           </fieldset>
           <fieldset>
             <legend>Publier un clip toutes les</legend>
