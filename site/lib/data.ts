@@ -31,7 +31,11 @@ export type Clip = {
   rank?: number;              // place dans le classement de ce passage
   potential?: number | null;  // note de potentiel /10 (présélection Claude Haiku)
   potential_reason?: string;
+  networks?: Networks;        // publication par réseau (lib/buffer.ts)
 };
+
+export type NetworkState = { state: "scheduled" | "posted" | "draft" | "error"; due?: string; id?: string; url?: string; error?: string; at: string };
+export type Networks = Partial<Record<"tiktok" | "youtube" | "instagram", NetworkState>>;
 
 export type RunInfo = {
   id: string;
@@ -70,6 +74,7 @@ export type Decision = {
   description?: string;
   hashtags?: string[];
   post_url?: string;
+  networks?: Networks;
   at: string;
 };
 
@@ -146,6 +151,7 @@ export async function loadClips(): Promise<Clip[]> {
         clip.hashtags = d.hashtags ?? clip.hashtags;
         clip.post_url = d.post_url;
         clip.decided_at = d.at;
+        clip.networks = d.networks;
       }
       return clip;
     })

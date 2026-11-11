@@ -3,6 +3,7 @@ import CopyPost from "./CopyPost";
 import AutoRefresh from "./AutoRefresh";
 import { loadClips, loadHeartbeat, type Clip, type RunInfo, type Status } from "@/lib/data";
 import { GAMES, REPO, STREAMERS } from "@/lib/launch";
+import { bufferReady } from "@/lib/buffer";
 import { EVERY_OPTIONS, HOURS_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS, loadSchedule } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
@@ -255,7 +256,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
             <select name="publish_every_min" defaultValue={String(schedule.publish_every_min)}>
               {PUBLISH_OPTIONS.map((n) => <option key={n} value={n}>{fmtMin(n)}</option>)}
             </select>
-            <span className="muted small">Publication automatique pas encore branchée : les clips validés attendent dans « À poster ».</span>
+            <span className="muted small">{bufferReady()
+              ? "Chaque clip validé part tout seul sur TikTok et YouTube via Buffer, espacé de ce délai (10 programmés max)."
+              : "Publication auto pas encore branchée (clé Buffer manquante) : les clips validés attendent dans « À poster »."}</span>
           </fieldset>
           <fieldset>
             <legend>État</legend>
@@ -392,6 +395,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
                 )}
                 {tab === "approved" && (
                   <>
+                    <NetworkLine c={c} />
                     <CopyPost text={post} />
                     {c.video_url && <a className="btn ghost" href={c.video_url} target="_blank" rel="noreferrer">Ouvrir la vidéo</a>}
                     <label htmlFor={`p-${c.id}`}>Lien du post (TikTok, Shorts…)</label>
@@ -404,6 +408,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
                 )}
                 {tab === "posted" && (
                   <div className="actions">
+                    <NetworkLine c={c} />
                     {c.post_url ? <a className="btn ghost" href={c.post_url} target="_blank" rel="noreferrer">Voir le post</a> : <span className="muted">Pas de lien enregistré</span>}
                     <span className="muted small">Publié {ago(c.decided_at)}</span>
                   </div>
@@ -416,5 +421,25 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
       </section>
       ))}
     </div>
+  );
+}
+
+const NET_LABEL: Record<string, string> = { tiktok: "TikTok", youtube: "YouTube", instagram: "Instagram" };
+
+function NetworkLine({ c }: { c: Clip }) {
+  const nets = Object.entries(c.networks ?? {});
+  if (!nets.length) return null;
+  const hm = (iso?: string) => iso ? new Date(iso).toLocaleString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", hour: "2-digit", minute: "2-digit" }) : "";
+  return (
+    <span className="muted small" style={{ display: "block" }}>
+      {nets.map(([k, n]) => {
+        if (!n) return null;
+        const label = NET_LABEL[k] ?? k;
+        const txt = n.state === "error" ? `❌ ${label} : ${n.error}`
+          : n.state === "scheduled" ? (n.due && +new Date(n.due) <= Date.now() ? `📤 ${label} : heure prévue passée (${hm(n.due)}), voir Buffer` : `🕒 ${label} : programmé ${hm(n.due)}`)
+          : `✅ ${label}`;
+        return <span key={k} style={{ marginRight: 12 }}>{txt}</span>;
+      })}
+    </span>
   );
 }

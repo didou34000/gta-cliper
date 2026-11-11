@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deleteClip, saveDecision, type Status } from "@/lib/data";
+import { publishQueue } from "@/lib/buffer";
 
 const ALLOWED: Status[] = ["pending", "approved", "rejected", "posted"];
 
@@ -21,6 +22,8 @@ export async function POST(req: Request) {
     hashtags: hashtags.length ? hashtags : undefined,
     post_url: String(f.get("post_url") ?? "").trim() || undefined,
   });
+  // Un clip validé part tout de suite dans la file Buffer (si la clé est configurée).
+  if (status === "approved") await publishQueue().catch(() => {});
   const back = String(f.get("back") ?? "/");
   return NextResponse.redirect(new URL(back.startsWith("/") ? back : "/", req.url), 303);
 }
