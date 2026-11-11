@@ -68,7 +68,7 @@ def transcribe(path: Path, model: str = "large-v3", device: str = "auto",
     if _whisper_model is None:
         _whisper_model = WhisperModel(model, device=device, compute_type=compute_type)
     segments, _ = _whisper_model.transcribe(
-        str(path), language="fr", word_timestamps=True, vad_filter=True,
+        load_audio(path), language="fr", word_timestamps=True, vad_filter=True,
         condition_on_previous_text=False,
     )
     words: list[Word] = []
@@ -78,6 +78,15 @@ def transcribe(path: Path, model: str = "large-v3", device: str = "auto",
             if t:
                 words.append(Word(start=float(w.start), end=float(w.end), text=t))
     return words
+
+
+def load_audio(path: Path, sr: int = 16000):
+    """Audio mono 16 kHz en float32 via ffmpeg (évite le décodeur PyAV de faster-whisper,
+    dont l'API change selon les versions)."""
+    import numpy as np
+    r = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", str(path), "-vn", "-ac", "1",
+                        "-ar", str(sr), "-f", "f32le", "-"], capture_output=True, check=True)
+    return np.frombuffer(r.stdout, dtype=np.float32).copy()
 
 
 def save_words(words: list[Word], path: Path) -> None:
