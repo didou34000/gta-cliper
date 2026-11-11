@@ -2,7 +2,7 @@ import AltTitles from "./AltTitles";
 import CopyPost from "./CopyPost";
 import AutoRefresh from "./AutoRefresh";
 import { loadClips, loadHeartbeat, type Clip, type Status } from "@/lib/data";
-import { GAMES, REPO, STREAMERS } from "@/lib/launch";
+import { DEFAULT_CHECKED, GAMES, REPO, STREAMERS } from "@/lib/launch";
 
 export const dynamic = "force-dynamic";
 
@@ -102,11 +102,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
             </select>
             <input name="jeu_autre" placeholder="ou un autre jeu (nom exact sur Twitch)" maxLength={80} />
           </fieldset>
-          <fieldset>
-            <legend>Streamers</legend>
+          <fieldset className="wide">
+            <legend>Streamers ({STREAMERS.length})</legend>
             <div className="checks">
-              {STREAMERS.map((s) => (
-                <label key={s.login}><input type="checkbox" name="streamer" value={s.login} defaultChecked /> {s.name}</label>
+              {STREAMERS.map((s, i) => (
+                <label key={s.login}><input type="checkbox" name="streamer" value={s.login} defaultChecked={i < DEFAULT_CHECKED} /> {s.name}</label>
               ))}
             </div>
             <input name="streamers_autres" placeholder="autres logins Twitch, séparés par des virgules" maxLength={400} />

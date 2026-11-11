@@ -118,3 +118,5 @@ input.title{font-weight:700;font-size:16px}
 .checks input{width:auto;accent-color:var(--accent)}
 .btn-launch{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:700;cursor:pointer}
 .btn-launch:disabled{opacity:.5;cursor:not-allowed}
+.launch-form fieldset.wide{grid-column:1/-1}
+.checks{max-height:220px;overflow-y:auto}

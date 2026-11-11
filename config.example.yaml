@@ -11,8 +11,52 @@ streamers:
     name: ZeratoR
   - login: locklear
     name: Locklear
-  - login: amouranth_fr_exemple   # remplace par les vrais logins voulus
-    name: Exemple
+  - login: kamet0
+    name: Kameto
+  - login: domingo
+    name: Domingo
+  - login: ponce
+    name: Ponce
+  - login: antoinedaniel
+    name: Antoine Daniel
+  - login: joueur_du_grenier
+    name: Joueur du Grenier
+  - login: mistermv
+    name: MisterMV
+  - login: aminematue
+    name: Amine
+  - login: inoxtag
+    name: Inoxtag
+  - login: michou
+    name: Michou
+  - login: maghla
+    name: Maghla
+  - login: bagherajones
+    name: Baghera Jones
+  - login: etoiles
+    name: Etoiles
+  - login: sardoche
+    name: Sardoche
+  - login: rivenzi
+    name: Rivenzi
+  - login: lebouseuh
+    name: Lebouseuh
+  - login: jltomy
+    name: JLTomy
+  - login: chowh1
+    name: Chowh1
+  - login: zacknani
+    name: Zack Nani
+  - login: doigby
+    name: Doigby
+  - login: wankilstudio
+    name: Wankil Studio
+  - login: jirayalecochon
+    name: Jiraya
+  - login: tonton
+    name: Tonton
+  - login: mynthos
+    name: Mynthos
 
 # Jeu ciblé (nom exact sur Twitch). Les clips/VODs d'un autre jeu sont ignorés.
 game_name: "Grand Theft Auto VI"

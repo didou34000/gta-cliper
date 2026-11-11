@@ -260,8 +260,11 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
         rep.event(f"Jeu « {cfg['game_name']} » trouvé sur Twitch (id {game_id})", node="twitch")
     elif cfg.get("game_filter", True) and \
             os.environ.get("GAME_FILTER", "on").lower() not in ("off", "0", "non", "all"):
-        rep.event(f"Jeu « {cfg['game_name']} » introuvable sur Twitch : aucun filtre par jeu",
-                  node="twitch", level="warn")
+        # On s'arrête plutôt que de prendre tous les jeux sans le dire.
+        rep.event(f"Jeu « {cfg['game_name']} » introuvable sur Twitch : vérifie le nom exact "
+                  f"(ou choisis « Tous les jeux »). Passage arrêté.",
+                  node="twitch", level="error", force=True)
+        return []
     already = seen_ids(cfg)
     from .remote import seen_on_site
     on_site = seen_on_site()  # clips déjà envoyés (utile quand le disque est vidé à chaque passage)
