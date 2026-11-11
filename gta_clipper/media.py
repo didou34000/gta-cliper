@@ -60,8 +60,11 @@ _whisper_model = None
 
 
 def transcribe(path: Path, model: str = "large-v3", device: str = "auto",
-               compute_type: str = "auto") -> list[Word]:
-    """Transcription FR avec horodatage au mot (nécessaire pour les sous-titres animés)."""
+               compute_type: str = "auto", streamer: str = "") -> list[Word]:
+    """Transcription FR avec horodatage au mot (nécessaire pour les sous-titres animés).
+
+    Le texte d'amorce donne à Whisper le contexte et l'orthographe des noms propres
+    (streamer, jeu), ce qui évite une bonne partie des erreurs sur ces mots."""
     global _whisper_model
     from faster_whisper import WhisperModel
 
@@ -69,7 +72,9 @@ def transcribe(path: Path, model: str = "large-v3", device: str = "auto",
         _whisper_model = WhisperModel(model, device=device, compute_type=compute_type)
     segments, _ = _whisper_model.transcribe(
         load_audio(path), language="fr", word_timestamps=True, vad_filter=True,
-        condition_on_previous_text=False,
+        condition_on_previous_text=False, beam_size=5,
+        initial_prompt=(f"Stream Twitch de {streamer} en français. " if streamer else "")
+        + "Il joue à GTA 6 (Grand Theft Auto VI) : Vice City, Leonida, Lucia, Jason.",
     )
     words: list[Word] = []
     for seg in segments:

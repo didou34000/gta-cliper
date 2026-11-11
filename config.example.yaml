@@ -56,10 +56,13 @@ subtitles:
   outline: 6
   position_y: 1350               # hauteur des sous-titres (sur 1920)
   uppercase: true
+  hook: true                     # accroche incrustée en haut de la vidéo (bandeau blanc)
+  hook_y: 330                    # hauteur de l'accroche (sur 1920)
+  hook_size: 76
 
 # Transcription
 whisper:
-  model: large-v3      # "medium" si pas de GPU, "small" pour tester vite
+  model: large-v3-turbo  # presque aussi précis que large-v3, bien plus rapide ; "small" pour tester vite
   device: auto         # auto | cpu | cuda
   compute_type: auto
 

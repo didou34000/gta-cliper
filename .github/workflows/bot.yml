@@ -34,7 +34,7 @@ jobs:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
       STOP: ${{ vars.STOP }}               # variable STOP=1 : arrêt d'urgence
-      WHISPER_MODEL: ${{ vars.WHISPER_MODEL || 'small' }}
+      WHISPER_MODEL: ${{ vars.WHISPER_MODEL || 'large-v3-turbo' }}
       GAME_FILTER: ${{ inputs.filtre_jeu || 'on' }}
       MAX_CLIPS: ${{ inputs.max_clips || '10' }}
       WHISPER_DEVICE: cpu

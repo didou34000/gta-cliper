@@ -45,6 +45,35 @@ def seen_ids(cfg: dict) -> set[str]:
     return ids
 
 
+def fallback_hook(streamer: str, twitch_title: str = "") -> str:
+    """Accroche sans IA : le titre du clip Twitch s'il est parlant, sinon un titre générique."""
+    t = " ".join((twitch_title or "").split())
+    if len(t) >= 8 and not t.isdigit() and len(t) <= 45:
+        return t
+    return f"{streamer} découvre GTA 6"
+
+
+def apply_corrections(words: list, corrections: list[dict]) -> list[dict]:
+    """Applique les corrections de l'IA : un mot remplacé par un mot (horodatage gardé),
+    ou un mot supprimé quand un nom avait été coupé en deux. Modifie la liste en place."""
+    done, drop = [], set()
+    for c in corrections or []:
+        i, new = c.get("i"), " ".join(str(c.get("text", "")).split())
+        if not (isinstance(i, int) and 0 <= i < len(words)) or " " in new or len(new) > 30:
+            continue
+        if not new:
+            if i > 0 and i - 1 not in drop:  # fusion avec le mot précédent
+                drop.add(i)
+                done.append({"i": i, "avant": words[i].text, "apres": ""})
+        elif new != words[i].text:
+            done.append({"i": i, "avant": words[i].text, "apres": new})
+            words[i].text = new
+    for i in sorted(drop, reverse=True):
+        words[i - 1].end = words[i].end
+        del words[i]
+    return done
+
+
 def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
                  twitch_title: str = "", source_url: str = "", extra: dict | None = None,
                  skip_llm: bool = False, words: list | None = None, beat=None) -> Path:
@@ -59,43 +88,55 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
     if words is None:
         beat("transcription", f"Transcription Whisper de {duration:.0f} s de vidéo "
                               f"(modèle {wc['model']}, sur {wc['device']})")
-        words = media.transcribe(video, wc["model"], wc["device"], wc["compute_type"])
+        words = media.transcribe(video, wc["model"], wc["device"], wc["compute_type"],
+                                 streamer=streamer_name)
     words = [w for w in words if w.start < duration]
     beat("transcription", f"{len(words)} mots reconnus" if words
          else "Aucune parole détectée : clip sans sous-titres")
     media.save_words(words, item_dir / "transcript.json")
 
+    # 1) Titre, accroche et corrections d'abord : l'accroche est incrustée dans la vidéo.
+    text = media.transcript_text(words)
+    meta = {"title": f"{streamer_name} sur GTA 6", "alt_titles": [], "description": "",
+            "hashtags": cfg["llm"]["base_hashtags"], "confidence": "low",
+            "hook": fallback_hook(streamer_name, twitch_title)}
+    import os
+    if not skip_llm and not os.environ.get("ANTHROPIC_API_KEY"):
+        beat("titre", "Pas de clé ANTHROPIC_API_KEY : titre et accroche provisoires")
+        skip_llm = True
+    if not skip_llm:
+        beat("titre", f"Claude écrit le titre et relit {len(words)} mots de transcription")
+        try:
+            m = generate_metadata(streamer_name, text, twitch_title, cfg["llm"]["model"],
+                                  cfg["llm"]["base_hashtags"], words=words).model_dump()
+            fixes = apply_corrections(words, m.pop("corrections", []))
+            if fixes:
+                media.save_words(words, item_dir / "transcript.json")
+                text = media.transcript_text(words)
+            meta = {**m, "hook": m.get("hook") or meta["hook"], "corrections": fixes}
+            beat("titre", f"Titre : « {meta['title']} » · accroche : « {meta['hook']} »"
+                          + (f" · {len(fixes)} mot(s) corrigé(s)" if fixes else "")
+                          + (" (peu sûr, à vérifier)" if meta.get("confidence") == "low" else ""))
+        except Exception as e:  # garde-fou ou panne de l'API : le clip n'est pas perdu
+            log.warning("Titre IA impossible : %s", e)
+            beat("titre", f"Titre IA impossible ({str(e)[:120]}) : titre provisoire")
+
+    # 2) Montage vertical avec accroche en haut et sous-titres animés.
     ass = subtitles.build_ass(
         words, item_dir / "subs.ass", width=rc["width"], height=rc["height"],
         font=sc["font"], font_size=sc["font_size"], per_line=sc["words_per_line"],
         color=sc["color"], highlight=sc["highlight_color"], outline=sc["outline"],
         pos_y=sc["position_y"], uppercase=sc["uppercase"],
+        hook=meta["hook"] if sc.get("hook", True) else "", hook_y=sc.get("hook_y", 330),
+        hook_size=sc.get("hook_size", 76), hook_duration=duration,
     )
     beat("render", f"Montage vertical {rc['width']}×{rc['height']} (mode {rc['layout']}) "
-                   f"+ sous-titres {sc['words_per_line']} mots par ligne")
+                   f"+ accroche en haut + sous-titres {sc['words_per_line']} mots par ligne")
     out = item_dir / "clip.mp4"
     render.render_vertical(video, ass, out, width=rc["width"], height=rc["height"],
                            layout=rc["layout"], facecam=rc.get("facecam"), duration=duration)
     render.extract_thumbnail(out, item_dir / "thumb.jpg", at=min(1.5, duration / 2))
-
     beat("render", f"Vidéo prête ({out.stat().st_size / 1e6:.1f} Mo, {duration:.0f} s)")
-    text = media.transcript_text(words)
-    meta = {"title": f"{streamer_name} sur GTA 6", "alt_titles": [], "description": "",
-            "hashtags": cfg["llm"]["base_hashtags"], "confidence": "low"}
-    import os
-    if not skip_llm and not os.environ.get("ANTHROPIC_API_KEY"):
-        beat("titre", "Pas de clé ANTHROPIC_API_KEY : titre provisoire à écrire toi-même")
-        skip_llm = True
-    if not skip_llm:
-        beat("titre", f"Claude écrit le titre à partir de {len(text.split())} mots de transcription")
-        try:
-            meta = generate_metadata(streamer_name, text, twitch_title, cfg["llm"]["model"],
-                                     cfg["llm"]["base_hashtags"]).model_dump()
-            beat("titre", f"Titre : « {meta['title']} »"
-                          + (" (peu sûr, à vérifier)" if meta.get("confidence") == "low" else ""))
-        except Exception as e:  # garde-fou ou panne de l'API : le clip n'est pas perdu
-            log.warning("Titre IA impossible : %s", e)
-            beat("titre", f"Titre IA impossible ({str(e)[:120]}) : titre provisoire")
 
     meta.update({
         "source_id": source_id, "source_url": source_url, "streamer": streamer_name,

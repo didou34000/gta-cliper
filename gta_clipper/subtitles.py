@@ -37,10 +37,26 @@ def group_words(words: list[Word], per_line: int = 3, max_gap: float = 0.6) -> l
     return groups
 
 
+def wrap_hook(text: str, max_chars: int = 18) -> list[str]:
+    """Coupe l'accroche en 1 à 3 lignes équilibrées (libass ne coupe pas avec WrapStyle 2)."""
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        if cur and len(cur) + 1 + len(w) > max_chars:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = f"{cur} {w}".strip()
+    if cur:
+        lines.append(cur)
+    return lines[:3]
+
+
 def build_ass(words: list[Word], out: Path, *, width: int = 1080, height: int = 1920,
               font: str = "Montserrat ExtraBold", font_size: int = 92, per_line: int = 3,
               color: str = "&H00FFFFFF", highlight: str = "&H0000E1FF", outline: int = 6,
-              pos_y: int = 1350, uppercase: bool = True, time_offset: float = 0.0) -> Path:
+              pos_y: int = 1350, uppercase: bool = True, time_offset: float = 0.0,
+              hook: str = "", hook_y: int = 330, hook_size: int = 76,
+              hook_duration: float = 0.0) -> Path:
     header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {width}
@@ -51,12 +67,24 @@ ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Cap,{font},{font_size},{color},{color},&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,{outline},3,5,60,60,0,1
+Style: Hook,{font},{hook_size},&H00000000,&H00000000,&H00FFFFFF,&H64000000,-1,0,0,0,100,100,0,0,3,18,0,5,60,60,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     lines = []
     cx = width // 2
+    if hook and hook_duration > 0:
+        # Accroche en haut : texte noir sur bandeau blanc, une ligne de bandeau par ligne
+        # de texte (comme les titres TikTok), visible pendant tout le clip.
+        rows = wrap_hook(_esc(hook.upper()))
+        step = int(hook_size * 1.32)
+        y0 = hook_y - step * (len(rows) - 1) // 2
+        for k, row in enumerate(rows):
+            lines.append(
+                f"Dialogue: 1,{_ts(0)},{_ts(hook_duration)},Hook,,0,0,0,,"
+                "{\\an5\\pos(" + f"{cx},{y0 + k * step}" + ")\\fad(150,0)}" + row
+            )
     for g in group_words(words, per_line):
         texts = [_esc(w.text.upper() if uppercase else w.text) for w in g]
         g_end = g[-1].end
