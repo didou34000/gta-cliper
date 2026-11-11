@@ -2,8 +2,10 @@
 # Les clés sont dans Settings > Secrets and variables > Actions (jamais dans le code).
 name: Bot GTA Clipper
 on:
-  schedule:
-    - cron: "7 * * * *"   # toutes les heures (heure UTC, à la minute 7)
+  # DÉSACTIVÉ tant qu'on n'a pas donné le feu vert. Pour lancer toutes les heures,
+  # retirer les « # » des deux lignes ci-dessous.
+  # schedule:
+  #   - cron: "7 * * * *"   # toutes les heures (heure UTC, à la minute 7)
   workflow_dispatch: {}    # bouton « Run workflow » pour lancer à la main
 
 concurrency:
