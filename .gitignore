@@ -1,0 +1,6 @@
+data/
+config.yaml
+.env
+__pycache__/
+*.pyc
+test/sample.mp4

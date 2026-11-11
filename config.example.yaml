@@ -1,0 +1,75 @@
+# Copie ce fichier en config.yaml et adapte-le.
+
+# Streamers FR à suivre (login Twitch, en minuscules).
+# Nom affiché = comment il apparaît dans le titre ("Squeezie découvre ...").
+streamers:
+  - login: squeezie
+    name: Squeezie
+  - login: gotaga
+    name: Gotaga
+  - login: zerator
+    name: ZeratoR
+  - login: locklear
+    name: Locklear
+  - login: amouranth_fr_exemple   # remplace par les vrais logins voulus
+    name: Exemple
+
+# Jeu ciblé (nom exact sur Twitch). Les clips/VODs d'un autre jeu sont ignorés.
+game_name: "Grand Theft Auto VI"
+
+# Fenêtre de recherche des clips (heures en arrière).
+lookback_hours: 48
+
+# Combien de clips max à produire par streamer et par passage.
+max_clips_per_streamer: 5
+
+# Clips Twitch : vues minimum pour être retenu.
+min_clip_views: 200
+
+# Détection sur VOD par pics de chat (optionnel, plus lourd).
+vod:
+  enabled: false
+  max_vods_per_streamer: 1
+  window_seconds: 30        # taille de fenêtre de comptage
+  min_zscore: 3.0           # sensibilité du pic (plus haut = plus strict)
+  clip_before: 20           # secondes gardées avant le pic
+  clip_after: 25            # secondes gardées après le pic
+  max_highlights_per_vod: 8
+
+# Rendu vertical
+render:
+  width: 1080
+  height: 1920
+  layout: blur          # blur = jeu entier au centre + fond flou ; crop = zoom plein écran
+  # Facecam (optionnel) : zone de la webcam dans la source 1920x1080, en pixels.
+  # Si renseignée, elle est placée en haut de la vidéo verticale.
+  facecam: null         # ex: {x: 1440, y: 0, w: 480, h: 270}
+  max_duration: 60      # secondes max (Shorts/TikTok/Reels)
+
+# Sous-titres animés mot par mot
+subtitles:
+  font: "Montserrat ExtraBold"   # installe la police ; sinon libass prend une police de secours
+  font_size: 92
+  words_per_line: 3
+  color: "&H00FFFFFF"            # blanc (format ASS &HAABBGGRR)
+  highlight_color: "&H0000E1FF"  # jaune/orange pour le mot prononcé
+  outline: 6
+  position_y: 1350               # hauteur des sous-titres (sur 1920)
+  uppercase: true
+
+# Transcription
+whisper:
+  model: large-v3      # "medium" si pas de GPU, "small" pour tester vite
+  device: auto         # auto | cpu | cuda
+  compute_type: auto
+
+# Génération du titre / description / hashtags
+llm:
+  model: claude-opus-5-5
+  base_hashtags: ["#GTA6", "#GTAVI", "#GTA"]
+
+paths:
+  work: data/work
+  review: data/review       # clips en attente de validation
+  approved: data/approved   # clips validés, prêts à poster
+  rejected: data/rejected

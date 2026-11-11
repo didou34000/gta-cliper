@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Validation des clips</title>
+<style>
+  :root { --bg:#0f0f12; --card:#1a1a20; --text:#eee; --muted:#999; --accent:#ffb000; --ok:#2ecc71; --ko:#e74c3c; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:16px 24px; display:flex; gap:16px; align-items:center; border-bottom:1px solid #2a2a30; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0 16px 0 0; }
+  header a { color:var(--muted); text-decoration:none; padding:6px 10px; border-radius:6px; }
+  header a.on { background:var(--card); color:var(--text); }
+  main { padding:24px; display:grid; gap:24px; grid-template-columns:repeat(auto-fill, minmax(min(100%, 640px), 1fr)); }
+  .card { background:var(--card); border-radius:12px; padding:16px; display:flex; gap:16px; flex-wrap:wrap; }
+  video { width:270px; height:480px; background:#000; border-radius:8px; }
+  form { flex:1; min-width:240px; display:flex; flex-direction:column; gap:8px; }
+  label { font-size:12px; color:var(--muted); }
+  input, textarea { width:100%; background:#111; color:var(--text); border:1px solid #333; border-radius:6px; padding:8px; font:inherit; }
+  input.title { font-size:17px; font-weight:700; }
+  .meta { font-size:12px; color:var(--muted); }
+  .low { color:var(--accent); font-weight:600; }
+  .alts button { background:none; border:1px dashed #444; color:var(--muted); border-radius:6px; padding:4px 8px; margin:2px 4px 2px 0; cursor:pointer; text-align:left; }
+  details { font-size:13px; color:var(--muted); }
+  .actions { display:flex; gap:8px; margin-top:auto; }
+  .actions button { flex:1; padding:10px; border:0; border-radius:8px; font-weight:700; cursor:pointer; color:#fff; }
+  .approve { background:var(--ok); } .reject { background:var(--ko); }
+  .empty { color:var(--muted); padding:48px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Clips GTA VI</h1>
+  <a href="/?tab=review" class="{{ 'on' if tab=='review' }}">À valider ({{ counts.review }})</a>
+  <a href="/?tab=approved" class="{{ 'on' if tab=='approved' }}">Validés ({{ counts.approved }})</a>
+  <a href="/?tab=rejected" class="{{ 'on' if tab=='rejected' }}">Rejetés ({{ counts.rejected }})</a>
+</header>
+<main>
+{% for it in items %}
+  <div class="card">
+    <video src="/media/{{ tab }}/{{ it._id }}/clip.mp4" poster="/media/{{ tab }}/{{ it._id }}/thumb.jpg" controls preload="none"></video>
+    <form method="post" action="/decide/{{ it._id }}">
+      <div class="meta">
+        {{ it.streamer }} · {{ it.duration }} s
+        {% if it.views %}· {{ it.views }} vues Twitch{% endif %}
+        {% if it.chat_zscore %}· pic de chat z={{ it.chat_zscore }}{% endif %}
+        {% if it.source_url %}· <a href="{{ it.source_url }}" target="_blank" style="color:var(--muted)">source</a>{% endif %}
+        {% if it.confidence == 'low' %}<div class="low">⚠ Titre peu sûr : vérifie qu'il colle au clip</div>{% endif %}
+      </div>
+      <label>Titre</label>
+      <input class="title" name="title" value="{{ it.title }}" {{ 'disabled' if tab!='review' }}>
+      {% if it.alt_titles and tab=='review' %}
+      <div class="alts">{% for a in it.alt_titles %}<button type="button" onclick="this.form.title.value=this.textContent">{{ a }}</button>{% endfor %}</div>
+      {% endif %}
+      <label>Description</label>
+      <textarea name="description" rows="3" {{ 'disabled' if tab!='review' }}>{{ it.description }}</textarea>
+      <label>Hashtags</label>
+      <input name="hashtags" value="{{ it.hashtags|join(' ') }}" {{ 'disabled' if tab!='review' }}>
+      <details><summary>Transcription</summary>{{ it.transcript }}</details>
+      {% if tab=='review' %}
+      <div class="actions">
+        <button class="approve" name="action" value="approve">Valider</button>
+        <button class="reject" name="action" value="reject">Rejeter</button>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+{% else %}
+  <div class="empty">Rien ici pour l'instant.</div>
+{% endfor %}
+</main>
+</body>
+</html>
