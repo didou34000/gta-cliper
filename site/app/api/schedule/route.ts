@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { EVERY_OPTIONS, HOURS_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS, saveSchedule } from "@/lib/schedule";
+import { AUTO_OPTIONS, EVERY_OPTIONS, HOURS_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS, saveSchedule } from "@/lib/schedule";
 
 const pick = (v: FormDataEntryValue | null, allowed: number[], dflt: number) => {
   const n = parseInt(String(v ?? ""), 10);
@@ -18,6 +18,7 @@ export async function POST(req: Request) {
     min_views: pick(f.get("min_views"), VIEWS_OPTIONS, 200),
     hours: pick(f.get("hours"), HOURS_OPTIONS, 48),
     publish_every_min: pick(f.get("publish_every_min"), PUBLISH_OPTIONS, 120),
+    auto_min: pick(f.get("auto_min"), AUTO_OPTIONS, 7),
   });
   return NextResponse.redirect(new URL("/?prog=ok", req.url), 303);
 }

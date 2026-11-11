@@ -13,17 +13,19 @@ export type Schedule = {
   min_views: number;          // vues minimum d'un clip Twitch
   hours: number;              // fenêtre : clips des N dernières heures
   publish_every_min: number;  // rythme de publication voulu (utilisé par la file « À poster »)
+  auto_min: number;           // validation auto si potentiel ≥ N/10 (0 = toujours à la main)
   at?: string;
 };
 
 export const DEFAULT_SCHEDULE: Schedule = {
-  enabled: false, every_min: 30, game: "Grand Theft Auto VI", top: 8, max_clips: 3, min_views: 200, hours: 48, publish_every_min: 120,
+  enabled: false, every_min: 30, game: "Grand Theft Auto VI", top: 8, max_clips: 3, min_views: 200, hours: 48, publish_every_min: 120, auto_min: 7,
 };
 
 export const EVERY_OPTIONS = [10, 15, 20, 30, 60, 120, 180, 360];
 export const PUBLISH_OPTIONS = [10, 30, 60, 120, 180, 240, 360, 720];
 export const TOP_OPTIONS = [3, 5, 8, 10, 15];
 export const VIEWS_OPTIONS = [20, 50, 100, 200, 500, 1000, 5000];
+export const AUTO_OPTIONS = [0, 6, 7, 8, 9];
 export const HOURS_OPTIONS = [6, 12, 24, 48, 72, 100, 168, 200, 336, 720];
 
 export async function loadSchedule(): Promise<{ schedule: Schedule; lastRun: string | null }> {

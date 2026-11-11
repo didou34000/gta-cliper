@@ -4,7 +4,7 @@ import AutoRefresh from "./AutoRefresh";
 import { loadClips, loadHeartbeat, type Clip, type RunInfo, type Status } from "@/lib/data";
 import { GAMES, REPO, STREAMERS } from "@/lib/launch";
 import { bufferReady } from "@/lib/buffer";
-import { EVERY_OPTIONS, HOURS_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS, loadSchedule } from "@/lib/schedule";
+import { AUTO_OPTIONS, EVERY_OPTIONS, HOURS_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS, loadSchedule } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -259,6 +259,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
             <span className="muted small">{bufferReady()
               ? "Chaque clip validé part tout seul sur tes réseaux via Buffer, espacé de ce délai (10 programmés max)."
               : "Publication auto pas encore branchée (clé Buffer manquante) : les clips validés attendent dans « À poster »."}</span>
+          </fieldset>
+          <fieldset>
+            <legend>Validation automatique</legend>
+            <select name="auto_min" defaultValue={String(schedule.auto_min)}>
+              {AUTO_OPTIONS.map((n) => <option key={n} value={n}>{n ? `Si potentiel ≥ ${n}/10` : "Non, je valide tout à la main"}</option>)}
+            </select>
+            <span className="muted small">Un clip noté au-dessus du seuil (et au titre sûr) passe tout seul « À poster », puis part sur les réseaux. Les autres attendent ta validation.</span>
           </fieldset>
           <fieldset>
             <legend>État</legend>

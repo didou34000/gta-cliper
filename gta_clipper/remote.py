@@ -249,6 +249,31 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def auto_approve_min() -> int:
+    """Seuil de validation automatique réglé sur le site (Programmation) : un clip dont la
+    note de potentiel atteint ce seuil passe directement « À poster ». 0 = désactivé."""
+    env = os.environ.get("AUTO_APPROVE_MIN")
+    if env is not None and env.strip().isdigit():
+        return int(env)
+    try:
+        cfgs = sorted((b for b in _list("schedule/") if b["pathname"].startswith("schedule/config-")),
+                      key=lambda b: b["uploadedAt"])
+        if cfgs:
+            return int(requests.get(cfgs[-1]["url"], timeout=20).json().get("auto_min", 7))
+    except Exception as e:
+        log.warning("Seuil de validation auto illisible (%s) : validation manuelle", e)
+        return 0
+    return 7
+
+
+def approve(cid: str, reason: str) -> None:
+    """Valide un clip à la place de l'humain (même format que le bouton « Valider » du site)."""
+    put(f"decisions/{cid}/{int(time.time() * 1000)}.json",
+        json.dumps({"status": "approved", "auto": True, "reason": reason,
+                    "at": datetime.now(timezone.utc).isoformat()}, ensure_ascii=False).encode(),
+        "application/json")
+
+
 def upload_clip(item_dir: Path) -> None:
     """Envoie clip.mp4, thumb.jpg puis meta.json (en dernier : le site n'affiche un clip
     qu'une fois sa meta présente, donc jamais un clip à moitié envoyé)."""

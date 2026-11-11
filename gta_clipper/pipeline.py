@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import unicodedata
 from datetime import datetime, timezone
@@ -245,6 +246,41 @@ def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[
     return out
 
 
+_AUTO_MIN: int | None = None
+
+
+def _auto_approve(item, extra: dict, rep) -> bool:
+    """Si la note de potentiel atteint le seuil réglé sur le site, le clip est validé tout
+    seul (la publication Buffer le prend ensuite). Jamais si le titre est marqué peu sûr."""
+    global _AUTO_MIN
+    from .remote import approve, auto_approve_min
+    if _AUTO_MIN is None:
+        _AUTO_MIN = auto_approve_min()
+    pot = extra.get("potential")
+    if not _AUTO_MIN or not pot or pot < _AUTO_MIN:
+        return False
+    try:
+        meta = json.loads((item / "meta.json").read_text(encoding="utf-8"))
+    except Exception:
+        meta = {}
+    if meta.get("confidence") == "low":
+        rep.event(f"Potentiel {pot}/10 mais titre peu sûr : laissé en validation manuelle",
+                  node="site")
+        return False
+    try:
+        approve(item.name, f"potentiel {pot}/10 ≥ {_AUTO_MIN}")
+    except Exception as e:
+        rep.event(f"Validation auto impossible : {e}", node="site", level="warn")
+        return False
+    try:  # demande tout de suite au site d'envoyer à Buffer (sans attendre le contrôle de 10 min)
+        import requests
+        requests.post(os.environ.get("SITE_URL", "https://gta-clipper.vercel.app") + "/api/publish",
+                      timeout=30)
+    except Exception:
+        pass
+    return True
+
+
 def _make_clip(cfg, rep, produced, already, *, sid, name, video_fn, label, **kw) -> None:
     """Télécharge, monte, titre et envoie un clip, en racontant chaque étape.
     Lève LimitReached si un garde-fou bloque : le passage s'arrête proprement."""
@@ -267,7 +303,11 @@ def _make_clip(cfg, rep, produced, already, *, sid, name, video_fn, label, **kw)
             try:
                 upload_clip(item)
                 _prune(cfg, rep, keep=item.name)
-                rep.event(f"Clip prêt à valider : {label}", node="site", force=True)
+                if _auto_approve(item, kw.get("extra") or {}, rep):
+                    rep.event(f"Validé automatiquement, part dans « À poster » : {label}",
+                              node="site", force=True)
+                else:
+                    rep.event(f"Clip prêt à valider : {label}", node="site", force=True)
             except Exception as e:
                 rep.stats["erreurs"] += 1
                 rep.event(f"Clip prêt en local mais pas envoyé sur le site : {e}",
