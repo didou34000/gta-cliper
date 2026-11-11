@@ -67,27 +67,91 @@ class LogBuffer(logging.Handler):
 
 
 class Reporter:
-    """Envoie un 'battement de cœur' au site à chaque étape importante."""
+    """Raconte au site ce que fait le bot : un journal d'événements détaillé
+    (quel streamer, quelle étape, quel clip) + un résumé par streamer.
+
+    Chaque envoi contient tout l'état courant (40 derniers événements inclus), donc le
+    site n'a besoin de lire que le dernier fichier. Les envois sont espacés d'au moins
+    MIN_INTERVAL secondes pour ne pas consommer le quota d'opérations de Vercel Blob ;
+    le début, la fin et les erreurs partent toujours tout de suite.
+    """
+
+    MIN_INTERVAL = 20
 
     def __init__(self):
         self.on = enabled()
         self.stats = {"clips_trouves": 0, "clips_produits": 0, "erreurs": 0}
+        self.streamers: dict[str, dict] = {}
+        self.events: deque[dict] = deque(maxlen=40)
+        self.status, self.node, self.step, self.message = "idle", "", "", ""
+        self.current = ""
+        self._last_push = 0.0
+        self._dirty = False
         self.buffer = LogBuffer()
         logging.getLogger("gta_clipper").addHandler(self.buffer)
 
+    # --- résumé par streamer ---------------------------------------------
+    def streamer(self, name: str) -> dict:
+        return self.streamers.setdefault(name, {
+            "etat": "en attente", "clips_vus": 0, "retenus": 0, "deja_faits": 0,
+            "produits": 0, "erreurs": 0, "pics_chat": 0, "action": "", "ts": "",
+        })
+
+    def add(self, name: str, key: str, n: int = 1):
+        self.streamer(name)[key] += n
+
+    # --- journal ---------------------------------------------------------
+    def event(self, text: str, *, streamer: str = "", node: str = "", level: str = "info",
+              status: str = "running", force: bool = False):
+        """Ajoute une ligne au journal du site et met à jour l'étape en cours."""
+        streamer = streamer or self.current
+        self.events.appendleft({"ts": _now(), "streamer": streamer, "node": node,
+                                "text": text, "level": level})
+        self.status, self.step, self.message = status, text, ""
+        if node:
+            self.node = node
+        if streamer:
+            st = self.streamer(streamer)
+            st["action"], st["ts"] = text, _now()
+            if level == "error":
+                st["erreurs"] += 1
+        (log.warning if level in ("warn", "error") else log.info)(
+            "%s%s", f"[{streamer}] " if streamer else "", text)
+        self._dirty = True
+        self.push(force=force or level == "error")
+
     def beat(self, status: str, step: str = "", message: str = "", with_logs: bool = False,
              node: str = ""):
-        if not self.on:
+        """Compatibilité : début/fin de passage, test de liaison."""
+        self.status, self.step, self.message = status, step, message
+        if node:
+            self.node = node
+        self.events.appendleft({"ts": _now(), "streamer": self.current, "node": node,
+                                "text": step + (f" : {message}" if message else ""),
+                                "level": "error" if status == "error" else "info"})
+        self._dirty = True
+        self.push(force=True, with_logs=with_logs)
+
+    def push(self, force: bool = False, with_logs: bool = False):
+        if not self.on or not self._dirty:
             return
-        hb = {"ts": datetime.now(timezone.utc).isoformat(), "status": status, "step": step,
-              "message": message, "node": node, "stats": dict(self.stats)}
+        if not force and time.time() - self._last_push < self.MIN_INTERVAL:
+            return
+        hb = {"ts": _now(), "status": self.status, "step": self.step, "message": self.message,
+              "node": self.node, "streamer": self.current, "stats": dict(self.stats),
+              "streamers": self.streamers, "events": list(self.events)}
         if with_logs:
             hb["logs"] = list(self.buffer.lines)
         try:
             put(f"heartbeat/{int(time.time() * 1000)}.json",
                 json.dumps(hb, ensure_ascii=False).encode(), "application/json")
+            self._last_push, self._dirty = time.time(), False
         except Exception as e:  # le site ne doit jamais bloquer le bot
             log.warning("Statut non envoyé au site : %s", e)
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 def upload_clip(item_dir: Path) -> None:

@@ -102,15 +102,21 @@ class TwitchClient:
             "first": 100,
         }
         clips: list[Clip] = []
+        st = {"total": 0, "hors_jeu": 0, "sous_seuil": 0, "doublons": 0, "retenus": 0,
+              "max_vues": 0}
         cursor = None
         for _ in range(5):  # 500 clips max
             if cursor:
                 params["after"] = cursor
             d = self._get("/clips", params)
             for c in d.get("data", []):
+                st["total"] += 1
                 if game_id and c.get("game_id") != game_id:
+                    st["hors_jeu"] += 1
                     continue
+                st["max_vues"] = max(st["max_vues"], c.get("view_count", 0))
                 if c.get("view_count", 0) < min_views:
+                    st["sous_seuil"] += 1
                     continue
                 clips.append(Clip(
                     id=c["id"], url=c["url"],
@@ -124,7 +130,13 @@ class TwitchClient:
             if not cursor:
                 break
         clips.sort(key=lambda c: c.view_count, reverse=True)
-        return dedupe_overlapping(clips)[:limit]
+        unique = dedupe_overlapping(clips)
+        st["doublons"] = len(clips) - len(unique)
+        out = unique[:limit]
+        st["retenus"] = len(out)
+        st["hors_quota"] = len(unique) - len(out)
+        self.last_clip_stats = st
+        return out
 
     def recent_vods(self, user_id: str, limit: int = 1) -> list[Vod]:
         d = self._get("/videos", {"user_id": user_id, "type": "archive", "first": limit})

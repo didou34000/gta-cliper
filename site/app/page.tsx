@@ -1,5 +1,6 @@
 import AltTitles from "./AltTitles";
 import CopyPost from "./CopyPost";
+import AutoRefresh from "./AutoRefresh";
 import { loadClips, loadHeartbeat, type Clip, type Status } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,12 @@ function ago(iso?: string) {
   const h = Math.floor(m / 60);
   if (h < 48) return `il y a ${h} h ${String(m % 60).padStart(2, "0")}`;
   return `il y a ${Math.floor(h / 24)} j`;
+}
+
+const NODE_LABEL: Record<string, string> = Object.fromEntries(NODES.map((n) => [n.key, n.label]));
+
+function hhmmss(iso: string) {
+  return new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris" });
 }
 
 function scoreOf(c: Clip) {
@@ -83,6 +90,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
             <>
               <span className="node-title">{n.label}</span>
               <span className="node-sub">{n.sub}</span>
+              {active && last?.streamer && <span className="node-now">{last.streamer}</span>}
               {count !== undefined && <span className="node-count">{count}</span>}
             </>
           );
@@ -96,6 +104,43 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
           );
         })}
       </section>
+
+      {state === "running" && <AutoRefresh seconds={15} />}
+
+      {last?.streamers && Object.keys(last.streamers).length > 0 && (
+        <section className="streamers" aria-label="Streamers">
+          {Object.entries(last.streamers).map(([name, s]) => (
+            <div key={name} className={`st st-${s.etat.replace(/\s/g, "-")} ${last.streamer === name && state === "running" ? "st-now" : ""}`}>
+              <div className="st-head"><b>{name}</b><span className="st-state">{s.etat}</span></div>
+              <div className="st-nums">
+                <span><b>{s.clips_vus}</b> clips vus</span>
+                <span><b>{s.retenus}</b> retenus</span>
+                {s.pics_chat > 0 && <span><b>{s.pics_chat}</b> pics de chat</span>}
+                <span><b>{s.produits}</b> produits</span>
+                {s.deja_faits > 0 && <span><b>{s.deja_faits}</b> déjà faits</span>}
+                {s.erreurs > 0 && <span className="st-err"><b>{s.erreurs}</b> erreur{s.erreurs > 1 ? "s" : ""}</span>}
+              </div>
+              {s.action && <div className="st-action">{s.action}{s.ts ? <span className="muted"> · {ago(s.ts)}</span> : null}</div>}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {last?.events?.length ? (
+        <details className="journal" open={state === "running"}>
+          <summary>Journal du bot ({last.events.length} dernières actions)</summary>
+          <ol>
+            {last.events.map((e, i) => (
+              <li key={i} className={`ev ev-${e.level}`}>
+                <time className="mono">{hhmmss(e.ts)}</time>
+                {e.streamer ? <span className="ev-who">{e.streamer}</span> : <span className="ev-who muted">bot</span>}
+                {e.node && <span className="ev-node">{NODE_LABEL[e.node] ?? e.node}</span>}
+                <span className="ev-text">{e.text}</span>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
 
       <div className="tabs">
         {TABS.map((t) => (

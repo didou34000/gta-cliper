@@ -70,7 +70,9 @@ Le dossier `site/` contient le tableau de bord privé (Vercel) : statut du bot e
 
 ## Automatiser
 
-Lancer `python -m gta_clipper run` toutes les heures (cron / Planificateur de tâches Windows). Les clips déjà traités ne sont jamais refaits.
+Le plus simple : `python -m gta_clipper loop` (un passage toutes les heures, laisse la fenêtre ouverte ; `--every 30` pour toutes les 30 min). Sinon, lancer `python -m gta_clipper run` avec cron ou le Planificateur de tâches Windows. Les clips déjà traités ne sont jamais refaits.
+
+Pendant un passage, le site affiche chaque action en direct : streamer en cours, nombre de clips trouvés et pourquoi ils sont écartés (hors GTA VI, sous le seuil de vues, doublons), téléchargement, transcription, montage, titre, envoi.
 
 ## À savoir
 

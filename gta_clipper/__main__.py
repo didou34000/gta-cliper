@@ -34,6 +34,11 @@ def main() -> None:
     r.add_argument("--no-llm", action="store_true", help="Sans génération de titre par IA")
     r.add_argument("--chat-dir", help="Dossier d'exports chat TwitchDownloader (<vod_id>.json)")
 
+    lp = sub.add_parser("loop", help="Tourne en continu : un passage toutes les N minutes")
+    lp.add_argument("--every", type=int, default=60, help="Minutes entre deux passages (60)")
+    lp.add_argument("--no-llm", action="store_true")
+    lp.add_argument("--chat-dir")
+
     lo = sub.add_parser("local", help="Traite une vidéo locale ou une URL (clip/VOD Twitch)")
     lo.add_argument("source", help="Fichier .mp4 ou URL")
     lo.add_argument("--streamer", required=True, help='Nom affiché, ex: "Squeezie"')
@@ -56,6 +61,17 @@ def main() -> None:
     if a.cmd == "run":
         out = run(cfg, skip_llm=a.no_llm, chat_dir=a.chat_dir)
         print(f"{len(out)} clip(s) en attente de validation. Lance : python -m gta_clipper review")
+    elif a.cmd == "loop":
+        import time
+        while True:
+            try:
+                out = run(cfg, skip_llm=a.no_llm, chat_dir=a.chat_dir)
+                print(f"{len(out)} nouveau(x) clip(s). Prochain passage dans {a.every} min.")
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:  # on ne s'arrête pas pour une erreur passagère
+                print(f"Passage en erreur ({e}). Nouvel essai dans {a.every} min.")
+            time.sleep(a.every * 60)
     elif a.cmd == "local":
         from . import media
         src = a.source

@@ -37,7 +37,17 @@ export type Heartbeat = {
   message?: string;
   stats?: Record<string, number>;
   logs?: string[];
+  streamer?: string;
+  streamers?: Record<string, StreamerState>;
+  events?: BotEvent[];
 };
+
+export type StreamerState = {
+  etat: string; clips_vus: number; retenus: number; deja_faits: number;
+  produits: number; erreurs: number; pics_chat: number; action: string; ts: string;
+};
+
+export type BotEvent = { ts: string; streamer: string; node: string; text: string; level: string };
 
 export type Decision = {
   status: Status;
@@ -76,7 +86,7 @@ export async function loadHeartbeat(): Promise<{ last: Heartbeat | null; history
   // Ménage : on garde les 60 derniers battements.
   const old = blobs.slice(60).map((b) => b.url);
   if (old.length) del(old).catch(() => {});
-  const recent = await Promise.all(blobs.slice(0, 12).map((b) => getJson<Heartbeat>(b.url)));
+  const recent = await Promise.all(blobs.slice(0, 1).map((b) => getJson<Heartbeat>(b.url)));
   const history = recent.filter(Boolean) as Heartbeat[];
   return { last: history[0] ?? null, history };
 }
