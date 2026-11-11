@@ -287,11 +287,15 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
         game_label = cfg["game_name"] if game_id else "tous les jeux"
         rep.event(f"Recherche des {top_n} plus gros streamers FR sur {game_label}", node="twitch",
                   force=True)
-        top = tw.top_streamers(game_id, n=min(top_n, 20), hours=cfg["lookback_hours"])
+        top = tw.top_streamers(game_id, n=min(top_n, 20), hours=cfg["lookback_hours"],
+                               known=[s["login"] for s in cfg.get("streamers", [])],
+                               min_views=cfg["min_clip_views"])
+        st = getattr(tw, "last_top_stats", {})
         if not top:
-            rep.event(f"Aucun streamer FR trouvé sur {game_label} (ni en live, ni en clips "
-                      f"sur {cfg['lookback_hours']} h). Passage arrêté.", node="twitch",
-                      level="warn", force=True)
+            rep.event(f"Aucun streamer FR n'a de clip à {cfg['min_clip_views']} vues ou plus sur "
+                      f"{game_label} dans les {cfg['lookback_hours']} dernières heures "
+                      f"({st.get('candidats', 0)} streamers vérifiés). Passage arrêté.",
+                      node="twitch", level="warn", force=True)
             return []
         cfg["streamers"] = [{"login": t["login"], "name": t["name"]} for t in top]
         for t in top:

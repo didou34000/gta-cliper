@@ -88,52 +88,59 @@ class TwitchClient:
         return data[0]["id"] if data else None
 
     def top_streamers(self, game_id: str | None, n: int = 8, language: str = "fr",
-                      hours: int = 48) -> list[dict]:
-        """Les N plus gros streamers d'une langue sur un jeu.
+                      hours: int = 48, known: list[str] | None = None,
+                      min_views: int = 200) -> list[dict]:
+        """Les N streamers d'une langue qui ont les meilleurs clips sur un jeu.
 
-        1) ceux dont les clips du jeu ont fait le plus de vues sur la fenêtre (le vrai
-           signal : c'est là qu'il y a des moments forts à couper) ;
-        2) si ça ne suffit pas, ceux en live en ce moment, triés par viewers.
-        Renvoie [{"login", "name", "why"}].
+        Candidats : les streamers connus (config), ceux en live sur le jeu dans la langue,
+        et ceux de la langue présents dans les clips les plus vus du jeu. Pour chacun on lit
+        ses clips récents sur ce jeu ; score = vues cumulées des clips au-dessus du seuil
+        (un streamer sans clip exploitable ne sert à rien, même s'il est gros).
+        Renvoie [{"login", "name", "why"}], meilleurs d'abord.
         """
-        out: dict[str, dict] = {}
-        if game_id:
-            now = datetime.now(timezone.utc)
-            views: dict[str, list] = {}
-            cp = {"game_id": game_id, "first": 100,
-                  "started_at": (now - timedelta(hours=hours)).isoformat().replace("+00:00", "Z"),
+        now = datetime.now(timezone.utc)
+        window = {"started_at": (now - timedelta(hours=hours)).isoformat().replace("+00:00", "Z"),
                   "ended_at": now.isoformat().replace("+00:00", "Z")}
-            cursor = None
-            for _ in range(10):  # 1000 clips les plus vus du jeu, toutes langues
+        cand: dict[str, str] = {l.lower(): l for l in (known or [])}
+        live: dict[str, int] = {}
+        params = {"language": language, "first": 100}
+        if game_id:
+            params["game_id"] = game_id
+        for st in self._get("/streams", params).get("data", [])[:40]:
+            cand.setdefault(st["user_login"].lower(), st["user_name"])
+            live[st["user_login"].lower()] = st.get("viewer_count", 0)
+        if game_id:
+            cp, cursor = {"game_id": game_id, "first": 100, **window}, None
+            for _ in range(3):
                 if cursor:
                     cp["after"] = cursor
                 d = self._get("/clips", cp)
                 for c in d.get("data", []):
-                    if (c.get("language") or "").lower() != language:
-                        continue
-                    name = c["broadcaster_name"]
-                    v = views.setdefault(name.lower(), [name, 0, 0])
-                    v[1] += c.get("view_count", 0)
-                    v[2] += 1
+                    if (c.get("language") or "").lower() == language:
+                        cand.setdefault(c["broadcaster_name"].lower(), c["broadcaster_name"])
                 cursor = d.get("pagination", {}).get("cursor")
                 if not cursor:
                     break
-            for login, (name, total, count) in sorted(views.items(), key=lambda kv: -kv[1][1]):
-                if len(out) >= n:
-                    return list(out.values())
-                out[login] = {"login": login, "name": name,
-                              "why": f"{count} clip(s), {_n(total)} vues en {hours} h"}
-        params = {"language": language, "first": 100}
-        if game_id:
-            params["game_id"] = game_id
-        for s in self._get("/streams", params).get("data", []):  # déjà triés par viewers
-            if len(out) >= n:
-                break
-            login = s["user_login"].lower()
-            if login not in out:
-                out[login] = {"login": login, "name": s["user_name"],
-                              "why": f"en live, {_n(s.get('viewer_count', 0))} viewers"}
-        return list(out.values())
+        logins = list(cand)[:80]
+        users: dict[str, dict] = {}
+        for i in range(0, len(logins), 100):
+            for u in self._get("/users", {"login": logins[i:i + 100]}).get("data", []):
+                users[u["login"].lower()] = u
+        scored = []
+        for login, u in users.items():
+            d = self._get("/clips", {"broadcaster_id": u["id"], "first": 100, **window})
+            good = [c.get("view_count", 0) for c in d.get("data", [])
+                    if (not game_id or c.get("game_id") == game_id)
+                    and c.get("view_count", 0) >= min_views]
+            if good:
+                scored.append((sum(good), len(good), login, u["display_name"]))
+        scored.sort(reverse=True)
+        out = [{"login": l, "name": name,
+                "why": f"{k} clip(s) ≥ {min_views} vues, {_n(total)} vues en {hours} h"
+                       + (f", en live ({_n(live[l])} viewers)" if l in live else "")}
+               for total, k, l, name in scored[:n]]
+        self.last_top_stats = {"candidats": len(users), "avec_clips": len(scored)}
+        return out
 
     def top_clips(self, broadcaster_id: str, hours: int, game_id: str | None = None,
                   min_views: int = 0, limit: int = 20) -> list[Clip]:
