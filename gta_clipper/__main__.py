@@ -8,7 +8,23 @@ from pathlib import Path
 from .pipeline import load_config, process_clip, run
 
 
+def load_dotenv(path: str = ".env") -> None:
+    """Charge un fichier .env simple (CLE=valeur) sans écraser les variables déjà définies."""
+    import os
+    f = Path(path)
+    if not f.exists():
+        return
+    for line in f.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        if v.strip():
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
 def main() -> None:
+    load_dotenv()
     p = argparse.ArgumentParser(prog="gta_clipper")
     p.add_argument("--config", default="config.yaml")
     p.add_argument("-v", "--verbose", action="store_true")

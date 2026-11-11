@@ -25,30 +25,13 @@ h1{font-family:var(--f-display);font-weight:400;font-size:44px;line-height:1;mar
 .links a:hover,.linkbtn:hover{color:var(--fg)}
 .banner{background:color-mix(in srgb,var(--warn) 15%,transparent);border:1px solid var(--warn);padding:10px 14px;border-radius:8px;margin:0}
 
-.status{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}
-@media (max-width:760px){.status{grid-template-columns:1fr}}
-.bot{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
-.bot-head{display:flex;gap:12px;align-items:center}
-.dot{width:14px;height:14px;border-radius:50%;background:var(--muted);flex:none}
-.bot-running .dot{background:var(--accent2);box-shadow:0 0 0 0 var(--accent2);animation:pulse 1.6s infinite}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none}
+.bot-running .dot{background:var(--accent2);animation:pulse 1.6s infinite}
 .bot-idle .dot{background:var(--ok)}
-.bot-error .dot{background:var(--ko)}
-.bot-offline .dot{background:var(--ko);opacity:.6}
+.bot-error .dot,.bot-offline .dot{background:var(--ko)}
 @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent2) 60%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
 @media (prefers-reduced-motion: reduce){.bot-running .dot{animation:none}}
-.bot-state{font-weight:700;font-size:17px}
-.bot-msg{font-size:14px}
-.stats{display:flex;flex-wrap:wrap;gap:8px 24px;margin:4px 0 0}
-.stats div{display:flex;flex-direction:column}
-.stats dt{font-size:11px;font-family:var(--f-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
-.stats dd{margin:0;font-family:var(--f-display);font-size:26px;font-variant-numeric:tabular-nums}
-.counters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.counter{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;text-decoration:none;display:flex;flex-direction:column;gap:2px}
-.counter .n{font-family:var(--f-display);font-size:34px;line-height:1;font-variant-numeric:tabular-nums}
-.counter.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-.log{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px}
 .log summary{cursor:pointer;font-weight:600}
-.log ul{list-style:none;padding:0;margin:10px 0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .log pre{background:var(--code);padding:10px;border-radius:8px;overflow-x:auto;font-size:12px;max-height:280px}
 
 .clips{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,560px),1fr));gap:18px}
@@ -102,6 +85,6 @@ input.title{font-weight:700;font-size:16px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .tabs > a{padding:6px 12px;border-radius:999px;border:1px solid var(--line);text-decoration:none;font-size:14px;color:var(--muted)}
 .tabs > a.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
-.tabs .log{margin-left:auto;background:none;border:0;padding:0;font-size:14px}
+.tabs .log{margin-left:auto;font-size:14px}
 .tabs .log pre{position:absolute;right:16px;max-width:min(700px,calc(100vw - 32px));z-index:5;background:var(--surface);border:1px solid var(--line)}
 @media (max-width:640px){.flow{flex-direction:column;align-items:stretch;overflow:visible}.flow-item{flex-direction:column;align-items:stretch;min-width:0}.node{width:100%;min-height:0;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:4px 10px}.node-count{margin:0 0 0 auto;font-size:22px}.arrow{width:2px;height:14px;margin:0 auto}.arrow::after{right:-4px;top:auto;bottom:-2px;border:5px solid transparent;border-top:6px solid var(--muted);border-bottom:0}}
