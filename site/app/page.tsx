@@ -296,7 +296,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
 
       {last?.streamers && Object.keys(last.streamers).length > 0 && (
         <section className="streamers" aria-label="Streamers">
-          {Object.entries(last.streamers).map(([name, s]) => (
+          {Object.entries(last.streamers).map(([name, s0]) => {
+            // Passage fini : une carte restée « en attente » / « en cours » est en réalité terminée.
+            const s = state !== "running" && ["en attente", "en cours", "arrêté"].includes(s0.etat)
+              ? { ...s0, etat: s0.produits ? "fini" : s0.erreurs ? "erreur" : "non retenu" } : s0;
+            return (
             <div key={name} className={`st st-${s.etat.replace(/\s/g, "-")} ${last.streamer === name && state === "running" ? "st-now" : ""}`}>
               <div className="st-head"><b>{name}</b><span className="st-state">{s.etat}</span></div>
               <div className="st-nums">
@@ -309,7 +313,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
               </div>
               {s.action && <div className="st-action">{s.action}{s.ts ? <span className="muted"> · {ago(s.ts)}</span> : null}</div>}
             </div>
-          ))}
+            );
+          })}
         </section>
       )}
 
