@@ -47,7 +47,8 @@ def render_vertical(src: Path, ass: Path, out: Path, *, width: int = 1080, heigh
         cmd += ["-t", f"{duration:.3f}"]
     cmd += [
         "-filter_complex", fg, "-map", "[v]", "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-r", "30",
+        "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-r", "30",
+        "-maxrate", "4M", "-bufsize", "8M",  # ~30 Mo par minute : tient dans le stockage gratuit
         "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart",
         str(out.resolve()),
     ]

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 FALLBACK_MODEL = "claude-opus-4-8"
 
 SYSTEM = """Tu écris les métadonnées de clips courts (TikTok, YouTube Shorts, Reels) \
-pour une page de clips de streamers français qui découvrent GTA VI.
+pour une page de clips de streamers français (jeu indiqué dans le message).
 
 Règles du titre :
 - Format accrocheur centré sur le streamer et l'action : "Squeezie découvre le manoir", \
@@ -16,11 +16,11 @@ Règles du titre :
 - Le titre doit décrire ce qui se passe VRAIMENT dans la transcription. \
 N'invente pas d'événement, de lieu ou de réaction absents du contenu. \
 Si la transcription est trop pauvre pour savoir ce qui se passe, reste général \
-("Squeezie réagit à sa première mission sur GTA 6") et mets confidence à "low".
+("Squeezie réagit à sa première partie") et mets confidence à "low".
 - Pas de faux clickbait ("il a quitté le stream !!!") si ce n'est pas dans le clip.
 
-Description : 1 à 2 phrases, ton naturel, mentionne le streamer et GTA 6, \
-termine par une incitation légère (ex. "Abonne-toi pour plus de clips GTA 6").
+Description : 1 à 2 phrases, ton naturel, mentionne le streamer et le jeu, \
+termine par une incitation légère (ex. "Abonne-toi pour plus de clips").
 
 Hashtags : 5 à 8, pertinents, en commençant par ceux du jeu et du streamer.
 
@@ -57,7 +57,7 @@ class ClipMetadata(BaseModel):
 def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "",
                       model: str = "claude-opus-5-5",
                       base_hashtags: list[str] | None = None,
-                      words: list | None = None) -> ClipMetadata:
+                      words: list | None = None, game: str = "") -> ClipMetadata:
     from .guard import Guard, LimitReached
     client = anthropic.Anthropic(max_retries=2, timeout=90)
     if words:  # mots numérotés pour que le modèle puisse corriger la transcription
@@ -65,6 +65,7 @@ def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "
     transcript = (transcript or '')[:6000]  # un clip fait 60 s max : borne de sécurité
     user = (
         f"Streamer : {streamer_name}\n"
+        f"Jeu : {game or '(non précisé)'}\n"
         f"Titre donné au clip sur Twitch par un viewer (peut être vide ou approximatif) : "
         f"{twitch_title or '(aucun)'}\n\n"
         f"Transcription du clip (auto, peut contenir des erreurs) :\n<transcription>\n"

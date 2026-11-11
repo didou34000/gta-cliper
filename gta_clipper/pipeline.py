@@ -80,12 +80,23 @@ def seen_ids(cfg: dict) -> set[str]:
     return ids
 
 
-def fallback_hook(streamer: str, twitch_title: str = "") -> str:
+SHORT_GAME = {"Grand Theft Auto VI": "GTA 6", "Grand Theft Auto V": "GTA 5"}
+
+
+def game_label(cfg: dict) -> str:
+    """Nom court du jeu pour les titres (« » si tous les jeux)."""
+    if not cfg.get("game_filter", True):
+        return ""
+    g = cfg.get("game_name", "")
+    return SHORT_GAME.get(g, g)
+
+
+def fallback_hook(streamer: str, twitch_title: str = "", game: str = "") -> str:
     """Accroche sans IA : le titre du clip Twitch s'il est parlant, sinon un titre générique."""
     t = " ".join((twitch_title or "").split())
     if len(t) >= 8 and not t.isdigit() and len(t) <= 45:
         return t
-    return f"{streamer} découvre GTA 6"
+    return f"{streamer} sur {game}" if game else f"Le meilleur moment de {streamer}"
 
 
 def apply_corrections(words: list, corrections: list[dict]) -> list[dict]:
@@ -124,7 +135,7 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
         beat("transcription", f"Transcription Whisper de {duration:.0f} s de vidéo "
                               f"(modèle {wc['model']}, sur {wc['device']})")
         words = media.transcribe(video, wc["model"], wc["device"], wc["compute_type"],
-                                 streamer=streamer_name)
+                                 streamer=streamer_name, game=cfg.get("game_name", "") if cfg.get("game_filter", True) else "")
     words = [w for w in words if w.start < duration]
     beat("transcription", f"{len(words)} mots reconnus" if words
          else "Aucune parole détectée : clip sans sous-titres")
@@ -132,9 +143,11 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
 
     # 1) Titre, accroche et corrections d'abord : l'accroche est incrustée dans la vidéo.
     text = media.transcript_text(words)
-    meta = {"title": f"{streamer_name} sur GTA 6", "alt_titles": [], "description": "",
-            "hashtags": cfg["llm"]["base_hashtags"], "confidence": "low",
-            "hook": fallback_hook(streamer_name, twitch_title)}
+    game = game_label(cfg)
+    meta = {"title": f"{streamer_name} sur {game}" if game else f"{streamer_name} en live",
+            "alt_titles": [], "description": "",
+            "hashtags": cfg["llm"]["base_hashtags"] if game.startswith("GTA") else [], "confidence": "low",
+            "hook": fallback_hook(streamer_name, twitch_title, game)}
     import os
     if not skip_llm and not os.environ.get("ANTHROPIC_API_KEY"):
         beat("titre", "Pas de clé ANTHROPIC_API_KEY : titre et accroche provisoires")
@@ -143,7 +156,8 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
         beat("titre", f"Claude écrit le titre et relit {len(words)} mots de transcription")
         try:
             m = generate_metadata(streamer_name, text, twitch_title, cfg["llm"]["model"],
-                                  cfg["llm"]["base_hashtags"], words=words).model_dump()
+                                  cfg["llm"]["base_hashtags"] if game.startswith("GTA") else [],
+                                  words=words, game=game).model_dump()
             fixes = apply_corrections(words, m.pop("corrections", []))
             if fixes:
                 media.save_words(words, item_dir / "transcript.json")

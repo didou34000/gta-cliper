@@ -58,9 +58,15 @@ class Word:
 
 _whisper_model = None
 
+# Vocabulaire donné à Whisper pour bien écrire les noms propres du jeu.
+GAME_PROMPTS = {
+    "Grand Theft Auto VI": "Il joue à GTA 6 (Grand Theft Auto VI) : Vice City, Leonida, Lucia, Jason.",
+    "Grand Theft Auto V": "Il joue à GTA 5 (Grand Theft Auto V) : Los Santos, Michael, Franklin, Trevor.",
+}
+
 
 def transcribe(path: Path, model: str = "large-v3", device: str = "auto",
-               compute_type: str = "auto", streamer: str = "") -> list[Word]:
+               compute_type: str = "auto", streamer: str = "", game: str = "") -> list[Word]:
     """Transcription FR avec horodatage au mot (nécessaire pour les sous-titres animés).
 
     Le texte d'amorce donne à Whisper le contexte et l'orthographe des noms propres
@@ -74,7 +80,7 @@ def transcribe(path: Path, model: str = "large-v3", device: str = "auto",
         load_audio(path), language="fr", word_timestamps=True, vad_filter=True,
         condition_on_previous_text=False, beam_size=5,
         initial_prompt=(f"Stream Twitch de {streamer} en français. " if streamer else "")
-        + "Il joue à GTA 6 (Grand Theft Auto VI) : Vice City, Leonida, Lucia, Jason.",
+        + (GAME_PROMPTS.get(game) or (f"Il joue à {game}." if game else "")),
     )
     words: list[Word] = []
     for seg in segments:
