@@ -112,8 +112,14 @@ export async function loadHeartbeat(): Promise<{ last: Heartbeat | null; history
 }
 
 export async function loadClips(): Promise<Clip[]> {
-  if (!hasStore()) return [];
+  return (await loadClipsAndSize()).clips;
+}
+
+/** Clips + place occupée par les vidéos/miniatures dans Blob (en octets), avec les mêmes appels list. */
+export async function loadClipsAndSize(): Promise<{ clips: Clip[]; bytes: number }> {
+  if (!hasStore()) return { clips: [], bytes: 0 };
   const [clipBlobs, decisionBlobs] = await Promise.all([listAll("clips/"), listAll("decisions/")]);
+  const bytes = clipBlobs.reduce((n, b) => n + (b.size ?? 0), 0);
 
   const byId = new Map<string, { meta?: string; video?: string; thumb?: string }>();
   for (const b of clipBlobs) {
@@ -156,7 +162,7 @@ export async function loadClips(): Promise<Clip[]> {
       return clip;
     })
   );
-  return (clips.filter(Boolean) as Clip[]).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return { clips: (clips.filter(Boolean) as Clip[]).sort((a, b) => b.created_at.localeCompare(a.created_at)), bytes };
 }
 
 /** Supprime définitivement un clip (vidéo, miniature, méta, décisions).
