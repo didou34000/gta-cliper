@@ -48,7 +48,7 @@ render:
 
 # Sous-titres animés mot par mot
 subtitles:
-  font: "Montserrat ExtraBold"   # installe la police ; sinon libass prend une police de secours
+  font: "DejaVu Sans"           # présente sur les serveurs GitHub ; mets "Arial Black" sur Mac
   font_size: 92
   words_per_line: 3
   color: "&H00FFFFFF"            # blanc (format ASS &HAABBGGRR)

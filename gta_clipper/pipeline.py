@@ -19,7 +19,17 @@ log = logging.getLogger("gta_clipper")
 
 
 def load_config(path: str | Path = "config.yaml") -> dict:
-    return yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    import os
+    p = Path(path)
+    if not p.exists() and p.name == "config.yaml" and Path("config.example.yaml").exists():
+        p = Path("config.example.yaml")
+    cfg = yaml.safe_load(p.read_text(encoding="utf-8"))
+    # Réglages Whisper surchargeables par variables d'environnement (serveur sans GPU…)
+    for key, env in (("model", "WHISPER_MODEL"), ("device", "WHISPER_DEVICE"),
+                     ("compute_type", "WHISPER_COMPUTE")):
+        if os.environ.get(env):
+            cfg["whisper"][key] = os.environ[env]
+    return cfg
 
 
 def slug(s: str) -> str:
@@ -171,6 +181,10 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
         rep.event(f"Jeu « {cfg['game_name']} » introuvable sur Twitch : aucun filtre par jeu",
                   node="twitch", level="warn")
     already = seen_ids(cfg)
+    from .remote import seen_on_site
+    on_site = seen_on_site()  # clips déjà envoyés (utile quand le disque est vidé à chaque passage)
+    if on_site:
+        already |= {sid for sid in on_site}
     work = Path(cfg["paths"]["work"])
     produced: list[Path] = []
     hours, min_views = cfg["lookback_hours"], cfg["min_clip_views"]
@@ -218,7 +232,7 @@ def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, pr
         for n, c in enumerate(clips, 1):
             sid = f"clip-{c.id}"
             label = f"clip {n}/{len(clips)} « {c.title} » ({c.view_count} vues)"
-            if sid in already:
+            if sid in already or slug(sid) in already:
                 info["deja_faits"] += 1
                 rep.event(f"Déjà traité, ignoré : {label}", node="scoring")
                 continue
@@ -250,7 +264,7 @@ def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, pr
                     sid = f"vod-{v.id}-{int(h.start)}"
                     t = f"{int(h.start) // 3600}h{int(h.start) % 3600 // 60:02d}"
                     label = f"pic de chat {n}/{len(hls)} à {t} (z = {h.score:.1f})"
-                    if sid in already:
+                    if sid in already or slug(sid) in already:
                         info["deja_faits"] += 1
                         rep.event(f"Déjà traité, ignoré : {label}", node="scoring")
                         continue

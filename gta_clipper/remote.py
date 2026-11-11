@@ -58,6 +58,33 @@ def put(pathname: str, data: bytes, content_type: str, random_suffix: bool = Tru
     raise RuntimeError(f"Envoi vers Vercel Blob échoué ({pathname}) : {last_err}")
 
 
+def seen_on_site() -> set[str]:
+    """Identifiants (forme « slug ») des clips déjà présents sur le site.
+    Les dossiers s'appellent AAAAMMJJ-HHMMSS-<slug de la source>."""
+    if not enabled():
+        return set()
+    import re
+    out, cursor = set(), None
+    try:
+        for _ in range(20):
+            params = {"prefix": "clips/", "limit": "1000", **({"cursor": cursor} if cursor else {})}
+            r = requests.get(f"{API}/?{urlencode(params)}", timeout=30, headers={
+                "authorization": f"Bearer {os.environ['BLOB_READ_WRITE_TOKEN']}",
+                "x-api-version": API_VERSION})
+            r.raise_for_status()
+            d = r.json()
+            for b in d.get("blobs", []):
+                parts = b.get("pathname", "").split("/")
+                if len(parts) >= 2:
+                    out.add(re.sub(r"^\d{8}-\d{6}-", "", parts[1]))
+            cursor = d.get("cursor") if d.get("hasMore") else None
+            if not cursor:
+                break
+    except Exception as e:
+        log.warning("Liste des clips du site illisible : %s", e)
+    return out
+
+
 class LogBuffer(logging.Handler):
     """Garde les dernières lignes de log pour les afficher sur le site."""
 

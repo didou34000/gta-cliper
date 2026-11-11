@@ -1,0 +1,62 @@
+# Fait tourner le bot sur les serveurs de GitHub, sans rien installer chez toi.
+# Les clés sont dans Settings > Secrets and variables > Actions (jamais dans le code).
+name: Bot GTA Clipper
+on:
+  schedule:
+    - cron: "7 * * * *"   # toutes les heures (heure UTC, à la minute 7)
+  workflow_dispatch: {}    # bouton « Run workflow » pour lancer à la main
+
+concurrency:
+  group: bot
+  cancel-in-progress: false  # jamais deux passages en même temps
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50       # garde-fou : un passage bloqué est coupé
+    env:
+      TWITCH_CLIENT_ID: ${{ vars.TWITCH_CLIENT_ID || '7t3dj86daadls0hj8rru2y2nuxxx2z' }}
+      TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      STOP: ${{ vars.STOP }}               # variable STOP=1 : arrêt d'urgence
+      WHISPER_MODEL: ${{ vars.WHISPER_MODEL || 'small' }}
+      WHISPER_DEVICE: cpu
+      WHISPER_COMPUTE: int8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: ffmpeg et police
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core >/dev/null
+      - name: Dépendances
+        run: pip install -q -r requirements.txt
+      - name: Modèle Whisper (cache)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-${{ env.WHISPER_MODEL }}
+      - name: Compteurs des garde-fous (cache du jour)
+        id: usage
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/usage.json
+          key: usage-${{ steps.usage.outputs.day }}-${{ github.run_id }}
+          restore-keys: usage-${{ steps.usage.outputs.day }}-
+      - name: Vérifier les clés
+        run: |
+          if [ -z "$TWITCH_CLIENT_SECRET" ]; then echo "::error::Secret TWITCH_CLIENT_SECRET manquant"; exit 1; fi
+          if [ -z "$BLOB_READ_WRITE_TOKEN" ]; then echo "::warning::BLOB_READ_WRITE_TOKEN manquant : rien ne sera envoyé au site"; fi
+      - name: Passage du bot
+        run: python -m gta_clipper run
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data/usage.json
+          key: usage-${{ steps.usage.outputs.day }}-${{ github.run_id }}
