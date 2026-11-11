@@ -351,10 +351,16 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
         _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, produced,
                         hours, min_views)
     except LimitReached as e:
-        info = rep.streamer(rep.current) if rep.current else None
-        if info:
-            info["etat"] = "arrêté"
         rep.event(f"Garde-fou : {e}. Reprise au prochain passage.", level="warn", force=True)
+    finally:
+        # Fin du passage : plus aucune carte ne doit rester « en attente » ou « en cours ».
+        for info in rep.streamers.values():
+            if info["produits"]:
+                info["etat"] = "fini"
+            elif info["erreurs"]:
+                info["etat"] = "erreur"
+            else:
+                info["etat"] = "non retenu"
     return produced
 
 
@@ -437,9 +443,6 @@ def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, pr
         info["etat"] = "en attente"
 
     _pick_and_make(cfg, skip_llm, rep, work, produced, already, pool)
-    for st in cfg["streamers"]:
-        info = rep.streamer(st["name"])
-        info["etat"] = "erreur" if info["erreurs"] and not info["produits"] else "fini"
     return produced
 
 
