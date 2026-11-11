@@ -101,8 +101,6 @@ def prune_site(max_clips: int = 20, keep: str = "") -> list[str]:
         parts = b["pathname"].split("/")
         if len(parts) >= 3:
             clips.setdefault(parts[1], []).append(b)
-    if len(clips) <= max_clips:
-        return []
     decisions: dict[str, list[dict]] = {}
     for b in _list("decisions/"):
         parts = b["pathname"].split("/")
@@ -118,8 +116,13 @@ def prune_site(max_clips: int = 20, keep: str = "") -> list[str]:
         except Exception:
             return "approved"  # dans le doute, on ne supprime pas en priorité
 
-    ranked = sorted((c for c in clips if c != keep), key=lambda cid: (PRUNE_ORDER.get(status(cid), 2), cid))
-    victims = ranked[: len(clips) - max_clips]
+    st = {cid: status(cid) for cid in clips if cid != keep}
+    # Les rejetés partent toujours (le site les supprime déjà, ceci nettoie les anciens).
+    victims = [cid for cid, s in st.items() if s == "rejected"]
+    rest = sorted((c for c in st if c not in victims), key=lambda cid: (PRUNE_ORDER.get(st[cid], 2), cid))
+    over = len(clips) - len(victims) - max_clips
+    if over > 0:
+        victims += rest[:over]
     for cid in victims:
         put(f"seen/{cid}.json", b"{}", "application/json", random_suffix=False, important=True)
         _delete([b["url"] for b in clips[cid]] + [b["url"] for b in decisions.get(cid, [])])

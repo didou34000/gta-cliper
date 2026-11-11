@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { saveDecision, type Status } from "@/lib/data";
+import { deleteClip, saveDecision, type Status } from "@/lib/data";
 
 const ALLOWED: Status[] = ["pending", "approved", "rejected", "posted"];
 
@@ -12,7 +12,9 @@ export async function POST(req: Request) {
   }
   const hashtags = String(f.get("hashtags") ?? "")
     .split(/\s+/).filter(Boolean).map((t) => (t.startsWith("#") ? t : `#${t}`));
-  await saveDecision(id, {
+  if (status === "rejected") {
+    await deleteClip(id);
+  } else await saveDecision(id, {
     status,
     title: String(f.get("title") ?? "").trim() || undefined,
     description: String(f.get("description") ?? "").trim() || undefined,

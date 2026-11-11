@@ -11,7 +11,6 @@ const TABS: { key: Status; label: string }[] = [
   { key: "pending", label: "À valider" },
   { key: "approved", label: "À poster" },
   { key: "posted", label: "Publiés" },
-  { key: "rejected", label: "Rejetés" },
 ];
 
 const NODES: { key: string; label: string; sub: string; stat?: string; tab?: Status }[] = [
@@ -383,7 +382,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
                 {tab === "pending" && (
                   <div className="actions">
                     <button className="btn ok" name="status" value="approved">Valider</button>
-                    <button className="btn ko" name="status" value="rejected">Rejeter</button>
+                    <button className="btn ko" name="status" value="rejected" title="Supprime définitivement le clip">Rejeter (supprime)</button>
                   </div>
                 )}
                 {tab === "approved" && (
@@ -402,11 +401,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
                   <div className="actions">
                     {c.post_url ? <a className="btn ghost" href={c.post_url} target="_blank" rel="noreferrer">Voir le post</a> : <span className="muted">Pas de lien enregistré</span>}
                     <span className="muted small">Publié {ago(c.decided_at)}</span>
-                  </div>
-                )}
-                {tab === "rejected" && (
-                  <div className="actions">
-                    <button className="btn ghost" name="status" value="pending">Remettre à valider</button>
                   </div>
                 )}
               </form>

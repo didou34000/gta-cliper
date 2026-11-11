@@ -153,6 +153,25 @@ export async function loadClips(): Promise<Clip[]> {
   return (clips.filter(Boolean) as Clip[]).sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
+/** Supprime définitivement un clip (vidéo, miniature, méta, décisions).
+ *  Un repère seen/<id>.json est gardé pour que le bot ne le refasse jamais. */
+export async function deleteClip(id: string) {
+  if (!/^[\w.-]+$/.test(id)) throw new Error("id invalide");
+  await put(`seen/${id}.json`, "{}", {
+    access: "public", contentType: "application/json", addRandomSuffix: false, allowOverwrite: true,
+  });
+  const urls: string[] = [];
+  for (const prefix of [`clips/${id}/`, `decisions/${id}/`]) {
+    let cursor: string | undefined;
+    do {
+      const r = await list({ prefix, cursor, limit: 1000 });
+      urls.push(...r.blobs.map((b) => b.url));
+      cursor = r.hasMore ? r.cursor : undefined;
+    } while (cursor);
+  }
+  if (urls.length) await del(urls);
+}
+
 export async function saveDecision(id: string, d: Omit<Decision, "at">) {
   if (!/^[\w.-]+$/.test(id)) throw new Error("id invalide");
   const at = new Date().toISOString();
