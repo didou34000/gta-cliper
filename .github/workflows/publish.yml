@@ -1,0 +1,17 @@
+# Toutes les 10 min, demande au site d'envoyer à Buffer les clips validés qui attendent
+# (utile quand la file Buffer était pleine : 10 posts programmés max en gratuit).
+# Ne publie rien tant que BUFFER_API_KEY n'est pas configurée sur Vercel.
+name: Publication Buffer
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Remplir la file Buffer
+        run: curl -sS -X POST https://gta-clipper.vercel.app/api/publish || true
