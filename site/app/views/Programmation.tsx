@@ -48,7 +48,10 @@ export default async function ProgView({ ctx, launch, prog }: { ctx: Ctx; launch
           {launch.startsWith("error") && <>GitHub a refusé le lancement (code {launch.slice(5)}). Le jeton est peut-être expiré ou sans le droit « Actions ».</>}
         </p>
       )}
-      {prog === "ok" && <p className="banner banner-ok">Réglage enregistré. Il est pris en compte au prochain contrôle (toutes les 20 min).</p>}
+      {prog === "ok" && <p className="banner banner-ok">{schedule.enabled
+        ? "Réglage enregistré. Les passages automatiques sont allumés : contrôle toutes les 20 min."
+        : "Réglage enregistré. Passages automatiques coupés : aucun contrôle ne tourne."}</p>}
+      {prog === "nogh" && <p className="banner">Réglage enregistré, mais GitHub n&apos;a pas pu {schedule.enabled ? "allumer" : "couper"} les contrôles automatiques (jeton GH_DISPATCH_TOKEN manquant ou sans le droit « Actions »).</p>}
 
       <Panel title="Publication sur TikTok et YouTube">
         <form method="post" action="/api/publish-toggle" className="form-grid">

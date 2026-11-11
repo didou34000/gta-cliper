@@ -110,7 +110,8 @@ def main() -> int:
         if run:
             mark_run(now)
     print(why)
-    values = {"run": "true" if run else "false"}
+    values = {"run": "true" if run else "false",
+              "off": "true" if not run and (not cfg or not cfg.get("enabled")) else "false"}
     if run and cfg:
         values |= {"jeu": str(cfg.get("game") or "Grand Theft Auto VI")[:80],
                    "top": str(int(cfg.get("top", 8))),

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { setWorkflow } from "@/lib/github";
 import { AUTO_OPTIONS, EVERY_OPTIONS, HOURS_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS, saveSchedule } from "@/lib/schedule";
 
 const pick = (v: FormDataEntryValue | null, allowed: number[], dflt: number) => {
@@ -9,8 +10,9 @@ const pick = (v: FormDataEntryValue | null, allowed: number[], dflt: number) => 
 export async function POST(req: Request) {
   const f = await req.formData();
   const other = String(f.get("jeu_autre") ?? "").trim();
+  const enabled = f.get("enabled") === "on";
   await saveSchedule({
-    enabled: f.get("enabled") === "on",
+    enabled,
     every_min: pick(f.get("every_min"), EVERY_OPTIONS, 30),
     game: (other || String(f.get("jeu") ?? "")).slice(0, 80) || "Grand Theft Auto VI",
     top: pick(f.get("top"), TOP_OPTIONS, 8),
@@ -20,5 +22,7 @@ export async function POST(req: Request) {
     publish_every_min: pick(f.get("publish_every_min"), PUBLISH_OPTIONS, 120),
     auto_min: pick(f.get("auto_min"), AUTO_OPTIONS, 7),
   });
-  return NextResponse.redirect(new URL("/?prog=ok", req.url), 303);
+  // Aucun contrôle toutes les 20 min tant que la programmation est coupée.
+  const gh = await setWorkflow("bot-cron.yml", enabled);
+  return NextResponse.redirect(new URL(`/?prog=${gh ? "ok" : "nogh"}`, req.url), 303);
 }
