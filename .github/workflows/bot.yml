@@ -72,30 +72,37 @@ jobs:
       MAX_CLIPS: ${{ needs.check.outputs.max_clips || '3' }}
       WHISPER_DEVICE: cpu
       WHISPER_COMPUTE: int8
+      FONTCONFIG_FILE: /etc/fonts/fonts.conf   # pour le ffmpeg statique
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-      - name: ffmpeg et police
-        timeout-minutes: 8     # les miroirs apt d'Ubuntu bloquent parfois : on ne reste pas coincé
+      # ffmpeg en binaire statique, gardé en cache : plus d'apt-get (les miroirs Ubuntu
+      # et le verrou dpkg des machines neuves bloquaient parfois plusieurs minutes).
+      - name: ffmpeg (cache)
+        id: ffcache
+        uses: actions/cache@v4
+        with:
+          path: ~/ffmpeg
+          key: ffmpeg-static-v1
+      - name: ffmpeg
+        timeout-minutes: 4
         run: |
-          need=""
-          command -v ffmpeg >/dev/null || need="$need ffmpeg"
-          fc-list | grep -qi "DejaVu Sans" || need="$need fonts-dejavu-core"
-          if [ -n "$need" ]; then
-            for i in 1 2 3; do
-              timeout 150 sudo apt-get install -y -qq --no-install-recommends $need >/dev/null && break
-              timeout 120 sudo apt-get update -qq || true
-            done
+          if [ ! -x ~/ffmpeg/ffmpeg ]; then
+            mkdir -p ~/ffmpeg /tmp/ffx
+            curl -fsSL --retry 3 --max-time 150 -o /tmp/ff.tar.xz \
+              https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz \
+            || curl -fsSL --retry 3 --max-time 150 -o /tmp/ff.tar.xz \
+              https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+            tar -xJf /tmp/ff.tar.xz -C /tmp/ffx
+            cp "$(find /tmp/ffx -type f -name ffmpeg | head -1)" "$(find /tmp/ffx -type f -name ffprobe | head -1)" ~/ffmpeg/
+            chmod +x ~/ffmpeg/*
           fi
-          if ! command -v ffmpeg >/dev/null; then   # secours : binaire statique
-            curl -fsSL --retry 3 -o /tmp/ff.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-            mkdir -p /tmp/ff && tar -xJf /tmp/ff.tar.xz -C /tmp/ff --strip-components=1
-            sudo cp /tmp/ff/ffmpeg /tmp/ff/ffprobe /usr/local/bin/
-          fi
-          ffmpeg -version | head -1
+          echo "$HOME/ffmpeg" >> "$GITHUB_PATH"
+          ~/ffmpeg/ffmpeg -version | head -1
+          fc-list | grep -i "DejaVu Sans" | head -1 || echo "::warning::police DejaVu absente : police par défaut"
       - name: Dépendances
         run: pip install -q -r requirements.txt
       - name: Modèle Whisper (cache)
