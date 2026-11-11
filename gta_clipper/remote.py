@@ -86,26 +86,42 @@ def _delete(urls: list[str]) -> None:
 PRUNE_ORDER = {"rejected": 0, "posted": 1, "pending": 2, "approved": 3}
 
 
-def prune_site(max_clips: int = 20, keep: str = "") -> list[str]:
-    """Garde au plus max_clips clips sur le site (plafond de stockage Vercel).
+MB = 1024 * 1024
 
-    Supprime d'abord les rejetés, puis les publiés, puis les plus anciens « à valider »,
-    et les « à poster » en tout dernier ; à statut égal, le plus ancien part en premier.
+
+def prune_site(max_clips: int = 0, keep: str = "", high_mb: int = 800, low_mb: int = 400,
+               keep_heartbeats: int = 30) -> list[str]:
+    """Ménage du stockage Vercel (plafond gratuit 1 Go) :
+
+    - les clips rejetés partent toujours ;
+    - les vieux statuts du bot (heartbeat/) au-delà des keep_heartbeats derniers partent ;
+    - dès que le stockage total atteint high_mb (800 Mo), on supprime des clips jusqu'à
+      redescendre sous low_mb (400 Mo) : d'abord les publiés, puis les plus anciens
+      « à valider », et les « à poster » en tout dernier ; à statut égal, le plus ancien d'abord ;
+    - max_clips > 0 ajoute un plafond en nombre de clips (0 = pas de plafond en nombre).
     Un petit repère seen/<id> est gardé pour que le bot ne refasse pas ce clip.
     Renvoie la liste des clips supprimés.
     """
-    if not enabled() or max_clips <= 0:
+    if not enabled():
         return []
+    every = _list("")
     clips: dict[str, list[dict]] = {}
-    for b in _list("clips/"):
-        parts = b["pathname"].split("/")
-        if len(parts) >= 3:
-            clips.setdefault(parts[1], []).append(b)
     decisions: dict[str, list[dict]] = {}
-    for b in _list("decisions/"):
+    beats: list[dict] = []
+    for b in every:
         parts = b["pathname"].split("/")
-        if len(parts) >= 3:
+        if parts[0] == "clips" and len(parts) >= 3:
+            clips.setdefault(parts[1], []).append(b)
+        elif parts[0] == "decisions" and len(parts) >= 3:
             decisions.setdefault(parts[1], []).append(b)
+        elif parts[0] == "heartbeat":
+            beats.append(b)
+    total = sum(int(b.get("size", 0)) for b in every)
+
+    old_beats = sorted(beats, key=lambda b: b["pathname"])[:-keep_heartbeats] if len(beats) > keep_heartbeats else []
+    if old_beats:
+        _delete([b["url"] for b in old_beats])
+        total -= sum(int(b.get("size", 0)) for b in old_beats)
 
     def status(cid: str) -> str:
         ds = sorted(decisions.get(cid, []), key=lambda b: b["pathname"])
@@ -116,16 +132,25 @@ def prune_site(max_clips: int = 20, keep: str = "") -> list[str]:
         except Exception:
             return "approved"  # dans le doute, on ne supprime pas en priorité
 
+    size = {cid: sum(int(b.get("size", 0)) for b in bl) for cid, bl in clips.items()}
     st = {cid: status(cid) for cid in clips if cid != keep}
-    # Les rejetés partent toujours (le site les supprime déjà, ceci nettoie les anciens).
     victims = [cid for cid, s in st.items() if s == "rejected"]
+    left = total - sum(size[c] for c in victims)
     rest = sorted((c for c in st if c not in victims), key=lambda cid: (PRUNE_ORDER.get(st[cid], 2), cid))
-    over = len(clips) - len(victims) - max_clips
-    if over > 0:
-        victims += rest[:over]
+    if total >= high_mb * MB:
+        for cid in rest:
+            if left <= low_mb * MB:
+                break
+            victims.append(cid)
+            left -= size[cid]
+    if max_clips > 0:
+        over = len(clips) - len(victims) - max_clips
+        victims += [c for c in rest if c not in victims][:max(0, over)]
     for cid in victims:
         put(f"seen/{cid}.json", b"{}", "application/json", random_suffix=False, important=True)
         _delete([b["url"] for b in clips[cid]] + [b["url"] for b in decisions.get(cid, [])])
+    if victims:
+        log.info("Ménage : %d clip(s) supprimé(s), stockage ~%d Mo", len(victims), left // MB)
     return victims
 
 

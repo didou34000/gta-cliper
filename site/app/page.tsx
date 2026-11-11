@@ -221,7 +221,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
             ? <b className="prog-on">active · toutes les {fmtMin(schedule.every_min)} · {schedule.game === "tous" ? "tous les jeux" : schedule.game} · top {schedule.top}</b>
             : <span className="muted">arrêtée</span>}
         </summary>
-        {prog === "ok" && <p className="muted small">Réglage enregistré. Il est pris en compte au prochain contrôle (toutes les 10 min).</p>}
+        {prog === "ok" && <p className="muted small">Réglage enregistré. Il est pris en compte au prochain contrôle (toutes les 20 min).</p>}
         <form method="post" action="/api/schedule" className="launch-form">
           <fieldset>
             <legend>Jeu</legend>

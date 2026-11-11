@@ -1,4 +1,4 @@
-// Programmation des passages, réglée depuis le site et lue par GitHub toutes les 10 min
+// Programmation des passages, réglée depuis le site et lue par GitHub toutes les 20 min
 // (gta_clipper/schedule.py).
 //  schedule/config-<ms>.json : chaque réglage enregistré (jamais écrasé, le plus récent gagne)
 //  schedule/last-run.json    : heure du dernier passage programmé (écrit par le bot)
@@ -6,7 +6,7 @@ import { list, put } from "@vercel/blob";
 
 export type Schedule = {
   enabled: boolean;
-  every_min: number;          // un passage toutes les N minutes (10 min minimum)
+  every_min: number;          // un passage toutes les N minutes (20 min minimum)
   game: string;               // nom exact Twitch, ou « tous »
   top: number;                // N plus gros streamers FR du jeu
   max_clips: number;          // clips max par passage
@@ -21,7 +21,7 @@ export const DEFAULT_SCHEDULE: Schedule = {
   enabled: false, every_min: 30, game: "Grand Theft Auto VI", top: 8, max_clips: 3, min_views: 200, hours: 48, publish_every_min: 120, auto_min: 7,
 };
 
-export const EVERY_OPTIONS = [10, 15, 20, 30, 60, 120, 180, 360];
+export const EVERY_OPTIONS = [20, 30, 60, 120, 180, 360];
 export const PUBLISH_OPTIONS = [10, 30, 60, 120, 180, 240, 360, 720];
 export const TOP_OPTIONS = [3, 5, 8, 10, 15];
 export const VIEWS_OPTIONS = [20, 50, 100, 200, 500, 1000, 5000];

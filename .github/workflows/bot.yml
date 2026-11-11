@@ -2,11 +2,11 @@
 # Les clés sont dans Settings > Secrets and variables > Actions (jamais dans le code).
 name: Bot GTA Clipper
 on:
-  # Toutes les 10 minutes, GitHub regarde la programmation réglée sur le site.
+  # Toutes les 20 minutes, GitHub regarde la programmation réglée sur le site.
   # Si elle est arrêtée (réglage par défaut), le contrôle s'arrête en quelques secondes
   # sans rien lancer.
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/20 * * * *"
   workflow_dispatch:       # bouton « Lancer » du site, ou « Run workflow » sur GitHub
     inputs:
       jeu:

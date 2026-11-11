@@ -1,6 +1,6 @@
 """Planification réglée depuis le site.
 
-GitHub lance ce petit script toutes les 10 minutes (sans rien installer). Il lit le dernier
+GitHub lance ce petit script toutes les 20 minutes (sans rien installer). Il lit le dernier
 réglage enregistré par le site dans Vercel Blob (schedule/config-<ms>.json) et décide si
 c'est l'heure d'un passage. Si oui, il note l'heure (schedule/last-run.json) et donne au
 passage le jeu, le nombre de streamers et le nombre de clips choisis.
@@ -62,7 +62,7 @@ def mark_run(now: datetime) -> None:
 def decide(cfg: dict | None, last: datetime | None, now: datetime) -> tuple[bool, str]:
     if not cfg or not cfg.get("enabled"):
         return False, "programmation arrêtée sur le site"
-    every = max(10, int(cfg.get("every_min", 30))) * 60
+    every = max(20, int(cfg.get("every_min", 30))) * 60
     if last and (now - last).total_seconds() < every - TOLERANCE_S:
         wait = int((every - (now - last).total_seconds()) // 60) + 1
         return False, f"prochain passage dans ~{wait} min"

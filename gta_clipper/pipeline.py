@@ -272,7 +272,7 @@ def _auto_approve(item, extra: dict, rep) -> bool:
     except Exception as e:
         rep.event(f"Validation auto impossible : {e}", node="site", level="warn")
         return False
-    try:  # demande tout de suite au site d'envoyer à Buffer (sans attendre le contrôle de 10 min)
+    try:  # demande tout de suite au site d'envoyer à Buffer (sans attendre le contrôle de 20 min)
         import requests
         requests.post(os.environ.get("SITE_URL", "https://gta-clipper.vercel.app") + "/api/publish",
                       timeout=30)
@@ -324,13 +324,17 @@ def _make_clip(cfg, rep, produced, already, *, sid, name, video_fn, label, **kw)
 
 
 def _prune(cfg: dict, rep, keep: str = "") -> None:
-    """Plafond de clips sur le site (stockage Vercel) : on supprime les plus inutiles."""
+    """Stockage Vercel : jamais plus de ~1 Go. À 800 Mo, on redescend à 400 Mo
+    (publiés et plus anciens d'abord, « à poster » en dernier) ; les rejetés partent toujours."""
     from .remote import prune_site
+    lim = cfg.get("limits", {})
     try:
-        gone = prune_site(int(cfg.get("limits", {}).get("max_clips_on_site", 20)), keep=keep)
+        gone = prune_site(int(lim.get("max_clips_on_site", 0)), keep=keep,
+                          high_mb=int(lim.get("storage_high_mb", 800)),
+                          low_mb=int(lim.get("storage_low_mb", 400)))
         if gone:
             rep.event(f"Ménage : {len(gone)} ancien(s) clip(s) supprimé(s) du site "
-                      f"(plafond {cfg.get('limits', {}).get('max_clips_on_site', 20)})", node="site")
+                      f"(stockage plafonné à {lim.get('storage_high_mb', 800)} Mo)", node="site")
     except Exception as e:
         log.warning("Ménage du site impossible : %s", e)
 

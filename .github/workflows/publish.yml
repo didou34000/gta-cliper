@@ -1,10 +1,10 @@
-# Toutes les 10 min, demande au site d'envoyer à Buffer les clips validés qui attendent
+# Toutes les 20 min, demande au site d'envoyer à Buffer les clips validés qui attendent
 # (utile quand la file Buffer était pleine : 10 posts programmés max en gratuit).
 # Ne publie rien tant que BUFFER_API_KEY n'est pas configurée sur Vercel.
 name: Publication Buffer
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/20 * * * *"
   workflow_dispatch:
 permissions:
   contents: read
