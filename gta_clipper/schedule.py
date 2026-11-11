@@ -86,7 +86,8 @@ def main() -> int:
     if run and cfg:
         values |= {"jeu": str(cfg.get("game") or "Grand Theft Auto VI")[:80],
                    "top": str(int(cfg.get("top", 8))),
-                   "max_clips": str(max(1, min(10, int(cfg.get("max_clips", 3)))))}
+                   "max_clips": str(max(1, min(10, int(cfg.get("max_clips", 3))))),
+                   "min_views": str(max(0, int(cfg.get("min_views", 200))))}
     if out:
         with open(out, "a", encoding="utf-8") as f:
             for k, v in values.items():

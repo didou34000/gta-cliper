@@ -30,6 +30,8 @@ def load_config(path: str | Path = "config.yaml") -> dict:
         if os.environ.get(env):
             cfg["whisper"][key] = os.environ[env]
     apply_launch_overrides(cfg, os.environ)
+    if (os.environ.get("MIN_VIEWS") or "").isdigit():
+        cfg["min_clip_views"] = int(os.environ["MIN_VIEWS"])
     return cfg
 
 
@@ -294,7 +296,10 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
         if not top:
             rep.event(f"Aucun streamer FR n'a de clip à {cfg['min_clip_views']} vues ou plus sur "
                       f"{game_label} dans les {cfg['lookback_hours']} dernières heures "
-                      f"({st.get('candidats', 0)} streamers vérifiés). Passage arrêté.",
+                      f"({st.get('candidats', 0)} streamers vérifiés"
+                      + (f" ; meilleur clip trouvé : {st['meilleur'][0]} vues chez {st['meilleur'][1]}"
+                         if st.get("meilleur", (0,))[0] else " ; aucun clip sur ce jeu")
+                      + "). Baisse les vues minimum ou choisis un autre jeu. Passage arrêté.",
                       node="twitch", level="warn", force=True)
             return []
         cfg["streamers"] = [{"login": t["login"], "name": t["name"]} for t in top]

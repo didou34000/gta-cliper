@@ -3,7 +3,7 @@ import CopyPost from "./CopyPost";
 import AutoRefresh from "./AutoRefresh";
 import { loadClips, loadHeartbeat, type Clip, type Status } from "@/lib/data";
 import { GAMES, REPO, STREAMERS } from "@/lib/launch";
-import { EVERY_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, loadSchedule } from "@/lib/schedule";
+import { EVERY_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS, loadSchedule } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +39,14 @@ function ago(iso?: string) {
 
 function fmtMin(n: number) {
   return n < 60 ? `${n} min` : n % 60 === 0 ? `${n / 60} h` : `${Math.floor(n / 60)} h ${n % 60}`;
+}
+
+function ViewsSelect({ value }: { value: number }) {
+  return (
+    <select name="min_views" defaultValue={String(value)}>
+      {VIEWS_OPTIONS.map((n) => <option key={n} value={n}>{n.toLocaleString("fr-FR")} vues</option>)}
+    </select>
+  );
 }
 
 function GameSelect({ value }: { value?: string }) {
@@ -129,6 +137,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
             <legend>Clips max</legend>
             <input type="number" name="max_clips" min={1} max={10} defaultValue={3} />
           </fieldset>
+          <fieldset>
+            <legend>Vues minimum par clip</legend>
+            <ViewsSelect value={200} />
+          </fieldset>
           <button type="submit" className="btn-launch" disabled={state === "running"}>
             {state === "running" ? "Un passage est déjà en cours" : "Lancer"}
           </button>
@@ -171,6 +183,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
           <fieldset>
             <legend>Clips max par passage</legend>
             <input type="number" name="max_clips" min={1} max={10} defaultValue={schedule.max_clips} />
+          </fieldset>
+          <fieldset>
+            <legend>Vues minimum par clip</legend>
+            <ViewsSelect value={schedule.min_views} />
           </fieldset>
           <fieldset>
             <legend>Publier un clip toutes les</legend>

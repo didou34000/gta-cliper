@@ -23,6 +23,8 @@ export async function POST(req: Request) {
   // Par défaut : les N plus gros streamers FR du jeu. Si des streamers sont cochés, on prend ceux-là.
   const top = uniq.length ? 0 : Math.min(20, Math.max(1, parseInt(String(f.get("top") ?? "8"), 10) || 8));
 
+  const minViews = [20, 50, 100, 200, 500, 1000, 5000].includes(parseInt(String(f.get("min_views")), 10))
+    ? String(parseInt(String(f.get("min_views")), 10)) : "200";
   const n = Math.min(10, Math.max(1, parseInt(String(f.get("max_clips") ?? "3"), 10) || 3));
 
   const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/dispatches`, {
@@ -33,7 +35,7 @@ export async function POST(req: Request) {
       "X-GitHub-Api-Version": "2022-11-28",
       "User-Agent": "gta-clipper-site",
     },
-    body: JSON.stringify({ ref: "main", inputs: { jeu, top_streamers: String(top), streamers: uniq.join(","), max_clips: String(n) } }),
+    body: JSON.stringify({ ref: "main", inputs: { jeu, top_streamers: String(top), streamers: uniq.join(","), max_clips: String(n), min_views: minViews } }),
     cache: "no-store",
   });
   if (!r.ok) {

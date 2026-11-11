@@ -126,12 +126,14 @@ class TwitchClient:
         for i in range(0, len(logins), 100):
             for u in self._get("/users", {"login": logins[i:i + 100]}).get("data", []):
                 users[u["login"].lower()] = u
-        scored = []
+        scored, best = [], (0, "")
         for login, u in users.items():
             d = self._get("/clips", {"broadcaster_id": u["id"], "first": 100, **window})
-            good = [c.get("view_count", 0) for c in d.get("data", [])
-                    if (not game_id or c.get("game_id") == game_id)
-                    and c.get("view_count", 0) >= min_views]
+            on_game = [c.get("view_count", 0) for c in d.get("data", [])
+                       if not game_id or c.get("game_id") == game_id]
+            if on_game and max(on_game) > best[0]:
+                best = (max(on_game), u["display_name"])
+            good = [v for v in on_game if v >= min_views]
             if good:
                 scored.append((sum(good), len(good), login, u["display_name"]))
         scored.sort(reverse=True)
@@ -139,7 +141,8 @@ class TwitchClient:
                 "why": f"{k} clip(s) ≥ {min_views} vues, {_n(total)} vues en {hours} h"
                        + (f", en live ({_n(live[l])} viewers)" if l in live else "")}
                for total, k, l, name in scored[:n]]
-        self.last_top_stats = {"candidats": len(users), "avec_clips": len(scored)}
+        self.last_top_stats = {"candidats": len(users), "avec_clips": len(scored),
+                               "meilleur": best}
         return out
 
     def top_clips(self, broadcaster_id: str, hours: int, game_id: str | None = None,
