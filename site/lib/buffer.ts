@@ -7,6 +7,7 @@
 // Sans clé, rien ne part : les clips attendent dans « À poster » comme avant.
 import { loadClips, saveDecision, type Clip, type Networks, type NetworkState } from "./data";
 import { loadSchedule } from "./schedule";
+import { list, put } from "@vercel/blob";
 
 const API = "https://api.buffer.com";
 const MAX_SCHEDULED = 10;         // limite du plan gratuit Buffer, par réseau
@@ -22,6 +23,27 @@ export const CHANNELS: Record<Net, string> = {
 const NETS = (Object.keys(CHANNELS) as Net[]).filter((n) => CHANNELS[n]);
 
 export const bufferReady = () => !!process.env.BUFFER_API_KEY;
+
+// Interrupteur « Publication auto » réglé sur le site : publish/state-<ms>.json (le plus récent gagne).
+// Éteint par défaut : même avec la clé Buffer, rien ne part tant qu'il n'est pas allumé.
+export async function publishEnabled(): Promise<boolean> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return false;
+  try {
+    const { blobs } = await list({ prefix: "publish/state-", limit: 1000 });
+    if (!blobs.length) return false;
+    const last = blobs.sort((a, b) => +new Date(a.uploadedAt) - +new Date(b.uploadedAt))[blobs.length - 1];
+    const r = await fetch(last.url, { next: { revalidate: 86400 } });
+    return r.ok ? !!(await r.json()).enabled : false;
+  } catch {
+    return false;
+  }
+}
+
+export async function setPublishEnabled(enabled: boolean) {
+  await put(`publish/state-${Date.now()}.json`, JSON.stringify({ enabled, at: new Date().toISOString() }), {
+    access: "public", contentType: "application/json", addRandomSuffix: true,
+  });
+}
 
 const MUTATION = `mutation CreatePost($input: CreatePostInput!) {
   createPost(input: $input) {
@@ -77,6 +99,7 @@ const dues = (c: Clip) =>
 /** Envoie à Buffer les clips validés, tant qu'il reste de la place dans la file Buffer. */
 export async function publishQueue(): Promise<{ ok: boolean; sent: number; message: string }> {
   if (!bufferReady()) return { ok: false, sent: 0, message: "BUFFER_API_KEY manquante : publication auto désactivée" };
+  if (!(await publishEnabled())) return { ok: false, sent: 0, message: "Publication auto coupée sur le site" };
   const [clips, { schedule }] = await Promise.all([loadClips(), loadSchedule()]);
   const now = Date.now();
   const every = Math.max(10, schedule.publish_every_min || 120) * 60_000;

@@ -2,7 +2,7 @@ import AltTitles from "../AltTitles";
 import CopyPost from "../CopyPost";
 import { NET_LABEL, PageHead, type Ctx } from "../ctx";
 import type { Clip, RunInfo } from "@/lib/data";
-import { bufferReady } from "@/lib/buffer";
+import { bufferReady, publishEnabled } from "@/lib/buffer";
 import { ago, dayTime, fmtHoursShort, fmtMin } from "@/lib/format";
 
 function runParams(r: RunInfo) {
@@ -60,10 +60,11 @@ export function NetworkLine({ c }: { c: Clip }) {
   );
 }
 
-export default function ClipsView({ ctx, status }: { ctx: Ctx; status: "pending" | "approved" }) {
+export default async function ClipsView({ ctx, status }: { ctx: Ctx; status: "pending" | "approved" }) {
   const shown = ctx.clips.filter((c) => c.status === status);
   const back = `/?v=${status === "pending" ? "valider" : "poster"}`;
   const pending = status === "pending";
+  const pubOn = bufferReady() && (await publishEnabled());
 
   return (
     <>
@@ -72,9 +73,9 @@ export default function ClipsView({ ctx, status }: { ctx: Ctx; status: "pending"
         sub={pending
           ? <>Vérifie le titre, corrige si besoin, puis <b>Valider</b>. <b>Rejeter</b> supprime le clip pour de bon.
               {ctx.schedule.auto_min ? <> Les clips notés ≥ {ctx.schedule.auto_min}/10 sont validés tout seuls.</> : null}</>
-          : bufferReady()
+          : pubOn
             ? <>Les clips validés partent tout seuls sur TikTok et YouTube via Buffer, un toutes les {fmtMin(ctx.schedule.publish_every_min)} (10 programmés max).</>
-            : <>Publication auto pas encore branchée (clé Buffer manquante) : copie le texte, poste à la main, puis colle le lien.</>}
+            : <>Publication auto {bufferReady() ? <>coupée (<a href="/?v=programmation">l'allumer</a>)</> : "pas encore branchée (clé Buffer manquante)"} : rien ne part tout seul. Copie le texte, poste à la main, puis colle le lien.</>}
       />
 
       {shown.length === 0 && (
