@@ -62,7 +62,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
         </div>
         <nav className="links">
           <a href="/frise.html">Comment ça marche</a>
-          <form method="post" action="/api/logout"><button className="linkbtn">Déconnexion</button></form>
         </nav>
       </header>
 
