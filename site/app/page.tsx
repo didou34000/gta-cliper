@@ -257,7 +257,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
               {PUBLISH_OPTIONS.map((n) => <option key={n} value={n}>{fmtMin(n)}</option>)}
             </select>
             <span className="muted small">{bufferReady()
-              ? "Chaque clip validé part tout seul sur TikTok et YouTube via Buffer, espacé de ce délai (10 programmés max)."
+              ? "Chaque clip validé part tout seul sur tes réseaux via Buffer, espacé de ce délai (10 programmés max)."
               : "Publication auto pas encore branchée (clé Buffer manquante) : les clips validés attendent dans « À poster »."}</span>
           </fieldset>
           <fieldset>

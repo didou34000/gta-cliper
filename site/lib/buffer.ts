@@ -2,7 +2,8 @@
 // Les clips « À poster » (validés) partent dans l'ordre de validation, espacés de
 // publish_every_min (réglage du site). Buffer publie ensuite tout seul à l'heure dite.
 //  - BUFFER_API_KEY (Vercel, obligatoire) : https://publish.buffer.com/settings/api
-//  - BUFFER_TIKTOK_CHANNEL_ID / BUFFER_YOUTUBE_CHANNEL_ID (facultatifs) : comptes Buffer visés
+//  - BUFFER_TIKTOK_CHANNEL_ID / BUFFER_YOUTUBE_CHANNEL_ID / BUFFER_INSTAGRAM_CHANNEL_ID (facultatifs) :
+//    comptes Buffer visés ; un réseau sans identifiant est ignoré
 // Sans clé, rien ne part : les clips attendent dans « À poster » comme avant.
 import { loadClips, saveDecision, type Clip, type Networks, type NetworkState } from "./data";
 import { loadSchedule } from "./schedule";
@@ -12,11 +13,13 @@ const MAX_SCHEDULED = 10;         // limite du plan gratuit Buffer, par réseau
 const FIRST_DELAY_MS = 3 * 60_000; // premier post au plus tôt dans 3 min
 const RETRY_AFTER_MS = 60 * 60_000; // après une erreur, on réessaie au bout d'1 h
 
-type Net = "tiktok" | "youtube";
+type Net = "tiktok" | "youtube" | "instagram";
 const CHANNELS: Record<Net, string> = {
-  tiktok: process.env.BUFFER_TIKTOK_CHANNEL_ID || "6af4991462b70b94b0f79ef4",   // @louetacam
+  tiktok: process.env.BUFFER_TIKTOK_CHANNEL_ID || "",
   youtube: process.env.BUFFER_YOUTUBE_CHANNEL_ID || "6af49c4762b70b94b0f7bdd3", // GTA 6 FRANCE
+  instagram: process.env.BUFFER_INSTAGRAM_CHANNEL_ID || "",
 };
+const NETS = (Object.keys(CHANNELS) as Net[]).filter((n) => CHANNELS[n]);
 
 export const bufferReady = () => !!process.env.BUFFER_API_KEY;
 
@@ -40,6 +43,7 @@ function inputFor(net: Net, c: Clip, due: Date) {
     assets: [{ video: { url: c.video_url } }],
   };
   if (net === "tiktok") return { ...base, text: caption(c), metadata: { tiktok: { title: c.title.slice(0, 90) } } };
+  if (net === "instagram") return { ...base, text: caption(c), metadata: { instagram: { type: "reel", shouldShareToFeed: true } } };
   const ytTitle = c.title.includes("#Shorts") ? c.title : `${c.title} #Shorts`;
   return {
     ...base,
@@ -91,7 +95,7 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
     if (inFlight >= MAX_SCHEDULED) break;
     const due = new Date(Math.max(now + FIRST_DELAY_MS, last + every));
     const networks: Networks = { ...(c.networks ?? {}) };
-    for (const net of ["tiktok", "youtube"] as Net[]) {
+    for (const net of NETS) {
       if (networks[net]?.state === "scheduled" || networks[net]?.state === "posted") continue;
       networks[net] = await send(net, c, due);
     }
