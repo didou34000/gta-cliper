@@ -1,0 +1,15 @@
+# Passages programmés : toutes les 20 min, regarde la programmation réglée sur le site et
+# lance un passage si c'est l'heure.
+# Ce workflow est DÉSACTIVÉ tant que la programmation est coupée : le site l'active ou le
+# désactive tout seul quand tu enregistres le réglage (Programmation > État).
+name: Bot GTA Clipper (programmé)
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+permissions:
+  contents: read
+  actions: write   # le contrôle se désactive tout seul si la programmation est coupée
+jobs:
+  passage:
+    uses: ./.github/workflows/bot.yml
+    secrets: inherit

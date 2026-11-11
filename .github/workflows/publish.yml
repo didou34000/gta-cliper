@@ -1,6 +1,8 @@
 # Toutes les 20 min, demande au site d'envoyer à Buffer les clips validés qui attendent
 # (utile quand la file Buffer était pleine : 10 posts programmés max en gratuit).
 # Ne publie rien tant que BUFFER_API_KEY n'est pas configurée sur Vercel.
+# Ce workflow est DÉSACTIVÉ tant que la publication auto est coupée : le site l'active ou le
+# désactive tout seul avec l'interrupteur (Programmation > Publication).
 name: Publication Buffer
 on:
   schedule:
@@ -8,10 +10,20 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: write   # se désactive tout seul si la publication auto est coupée
 jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - name: Remplir la file Buffer
-        run: curl -sS -X POST https://gta-clipper.vercel.app/api/publish || true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          r=$(curl -sS -X POST https://gta-clipper.vercel.app/api/publish || true)
+          echo "$r"
+          # Publication coupée sur le site : plus de passage toutes les 20 min (le site le rallume).
+          if [ "${{ github.event_name }}" = "schedule" ] && echo "$r" | grep -q "coupée"; then
+            gh workflow disable publish.yml || true
+          fi

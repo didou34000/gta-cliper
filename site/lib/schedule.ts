@@ -1,8 +1,12 @@
 // Programmation des passages, réglée depuis le site et lue par GitHub toutes les 20 min
 // (gta_clipper/schedule.py).
-//  schedule/config-<ms>.json : chaque réglage enregistré (jamais écrasé, le plus récent gagne)
+//  schedule/current.json     : le réglage en cours (nom fixe, écrasé à chaque enregistrement)
+//  schedule/config-<ms>.json : ancien format, lu seulement si current.json n'existe pas encore
 //  schedule/last-run.json    : heure du dernier passage programmé (écrit par le bot)
-import { list, put } from "@vercel/blob";
+// Lu en cache (1 h, vidé à chaque enregistrement) pour économiser le quota Blob.
+import { list } from "@vercel/blob";
+import { revalidateTag, unstable_cache } from "next/cache";
+import { readFixed, writeFixed } from "./blobfile";
 
 export type Schedule = {
   enabled: boolean;
@@ -28,26 +32,36 @@ export const VIEWS_OPTIONS = [20, 50, 100, 200, 500, 1000, 5000];
 export const AUTO_OPTIONS = [0, 6, 7, 8, 9];
 export const HOURS_OPTIONS = [6, 12, 24, 48, 72, 100, 168, 200, 336, 720];
 
+async function readConfig(): Promise<Schedule> {
+  const cur = await readFixed<Partial<Schedule>>("schedule/current.json", true);
+  if (cur) return { ...DEFAULT_SCHEDULE, ...cur };
+  if (cur === null) return DEFAULT_SCHEDULE;
+  // Ancien format : une liste, une seule fois (le bot recopie ensuite sous le nom fixe).
+  const { blobs } = await list({ prefix: "schedule/config-", limit: 1000 });
+  const last = blobs.sort((a, b) => +new Date(a.uploadedAt) - +new Date(b.uploadedAt)).pop();
+  if (!last) return DEFAULT_SCHEDULE;
+  const r = await fetch(last.url, { cache: "no-store" });
+  const cfg = r.ok ? { ...DEFAULT_SCHEDULE, ...(await r.json()) } : DEFAULT_SCHEDULE;
+  await writeFixed("schedule/current.json", cfg).catch(() => {});
+  return cfg;
+}
+
+const cachedConfig = unstable_cache(readConfig, ["schedule-config"], { revalidate: 3600, tags: ["schedule"] });
+
 export async function loadSchedule(): Promise<{ schedule: Schedule; lastRun: string | null }> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return { schedule: DEFAULT_SCHEDULE, lastRun: null };
   try {
-    const { blobs } = await list({ prefix: "schedule/", limit: 1000 });
-    const cfgs = blobs.filter((b) => b.pathname.startsWith("schedule/config-"))
-      .sort((a, b) => +new Date(a.uploadedAt) - +new Date(b.uploadedAt));
-    const last = blobs.find((b) => b.pathname === "schedule/last-run.json");
-    let schedule = DEFAULT_SCHEDULE;
-    if (cfgs.length) {
-      const r = await fetch(cfgs[cfgs.length - 1].url, { next: { revalidate: 86400 } });
-      if (r.ok) schedule = { ...DEFAULT_SCHEDULE, ...(await r.json()) };
-    }
-    return { schedule, lastRun: last ? new Date(last.uploadedAt).toISOString() : null };
+    const [schedule, last] = await Promise.all([
+      cachedConfig(),
+      readFixed<{ at?: string }>("schedule/last-run.json"),
+    ]);
+    return { schedule, lastRun: last?.at ? new Date(last.at).toISOString() : null };
   } catch {
     return { schedule: DEFAULT_SCHEDULE, lastRun: null };
   }
 }
 
 export async function saveSchedule(s: Schedule) {
-  await put(`schedule/config-${Date.now()}.json`, JSON.stringify({ ...s, at: new Date().toISOString() }), {
-    access: "public", contentType: "application/json", addRandomSuffix: true,
-  });
+  await writeFixed("schedule/current.json", { ...s, at: new Date().toISOString() });
+  revalidateTag("schedule", { expire: 0 });
 }

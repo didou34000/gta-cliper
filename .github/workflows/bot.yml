@@ -2,11 +2,16 @@
 # Les clés sont dans Settings > Secrets and variables > Actions (jamais dans le code).
 name: Bot GTA Clipper
 on:
-  # Toutes les 20 minutes, GitHub regarde la programmation réglée sur le site.
-  # Si elle est arrêtée (réglage par défaut), le contrôle s'arrête en quelques secondes
-  # sans rien lancer.
-  schedule:
-    - cron: "*/20 * * * *"
+  # Les passages programmés viennent de bot-cron.yml (toutes les 20 min), qui n'est activé
+  # que quand la programmation est allumée sur le site. Sinon, aucun contrôle ne tourne.
+  workflow_call:
+    inputs:   # mêmes noms que le lancement manuel (inutilisés pour un passage programmé)
+      jeu: { type: string, required: false }
+      top_streamers: { type: string, required: false }
+      streamers: { type: string, required: false }
+      max_clips: { type: string, required: false }
+      min_views: { type: string, required: false }
+      heures: { type: string, required: false }
   workflow_dispatch:       # bouton « Lancer » du site, ou « Run workflow » sur GitHub
     inputs:
       jeu:
@@ -35,6 +40,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: write   # pour se désactiver tout seul si la programmation est coupée
     outputs:
       run: ${{ steps.plan.outputs.run }}
       jeu: ${{ steps.plan.outputs.jeu }}
@@ -60,6 +68,14 @@ jobs:
           else
             { echo "run=true"; echo "jeu=$IN_JEU"; echo "top=${IN_TOP:-8}"; echo "max_clips=${IN_MAX:-3}"; echo "min_views=${IN_MIN:-200}"; echo "heures=${IN_HEURES:-48}"; } >> "$GITHUB_OUTPUT"
           fi
+      # Programmation coupée sur le site : on coupe aussi le contrôle des 20 min (le site le
+      # rallume quand tu réactives la programmation). Aucun contrôle ne tourne pour rien.
+      - name: Couper les contrôles automatiques
+        if: github.event_name == 'schedule' && steps.plan.outputs.off == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow disable bot-cron.yml || true
 
   run:
     needs: check

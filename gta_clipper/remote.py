@@ -4,7 +4,9 @@ Configuration : variable d'environnement BLOB_READ_WRITE_TOKEN (la même que cel
 projet Vercel, visible dans Vercel > Storage > le store Blob > ".env.local").
 Sans cette variable, tout est ignoré et le bot fonctionne en local comme avant.
 
-Les fichiers ne sont jamais écrasés (noms uniques), pour éviter le cache CDN de Blob.
+Les clips et décisions ne sont jamais écrasés (noms uniques), pour éviter le cache CDN de
+Blob. Seul le statut du bot (heartbeat/latest.json) est à nom fixe : le site le relit sans
+cache, ce qui lui évite de lister le dossier (quota gratuit : 2 000 list()/put() par mois).
 """
 from __future__ import annotations
 
@@ -30,7 +32,7 @@ def enabled() -> bool:
 
 
 def put(pathname: str, data: bytes, content_type: str, random_suffix: bool = True,
-        important: bool = True) -> dict:
+        important: bool = True, overwrite: bool = False) -> dict:
     from .guard import Guard
     if not Guard.get().allow_upload(important):
         raise RuntimeError("Plafond quotidien d'envois vers le site atteint")
@@ -42,6 +44,8 @@ def put(pathname: str, data: bytes, content_type: str, random_suffix: bool = Tru
         "x-content-type": content_type,
         "x-add-random-suffix": "1" if random_suffix else "0",
     }
+    if overwrite:  # fichier à nom fixe, relu par le site sans cache
+        headers |= {"x-allow-overwrite": "1", "x-cache-control-max-age": "60"}
     url = f"{API}/?{urlencode({'pathname': pathname})}"
     last_err = None
     for attempt in range(4):
@@ -195,7 +199,7 @@ class Reporter:
     le début, la fin et les erreurs partent toujours tout de suite.
     """
 
-    MIN_INTERVAL = 20
+    MIN_INTERVAL = 90  # quota gratuit Blob : 2 000 envois/mois, chaque battement en coûte un
 
     def __init__(self):
         self.on = enabled()
@@ -262,9 +266,9 @@ class Reporter:
         if with_logs:
             hb["logs"] = list(self.buffer.lines)
         try:
-            put(f"heartbeat/{int(time.time() * 1000)}.json",
+            put("heartbeat/latest.json",
                 json.dumps(hb, ensure_ascii=False).encode(), "application/json",
-                important=force)
+                random_suffix=False, overwrite=True, important=force)
             self._last_push, self._dirty = time.time(), False
         except Exception as e:  # le site ne doit jamais bloquer le bot
             log.warning("Statut non envoyé au site : %s", e)
@@ -281,10 +285,10 @@ def auto_approve_min() -> int:
     if env is not None and env.strip().isdigit():
         return int(env)
     try:
-        cfgs = sorted((b for b in _list("schedule/") if b["pathname"].startswith("schedule/config-")),
-                      key=lambda b: b["uploadedAt"])
-        if cfgs:
-            return int(requests.get(cfgs[-1]["url"], timeout=20).json().get("auto_min", 7))
+        from .schedule import latest_config  # lecture du fichier à nom fixe, sans liste
+        cfg = latest_config()
+        if cfg:
+            return int(cfg.get("auto_min", 7))
     except Exception as e:
         log.warning("Seuil de validation auto illisible (%s) : validation manuelle", e)
         return 0

@@ -274,7 +274,7 @@ def _auto_approve(item, extra: dict, rep) -> bool:
         return False
     try:  # demande tout de suite au site d'envoyer à Buffer (sans attendre le contrôle de 20 min)
         import requests
-        requests.post(os.environ.get("SITE_URL", "https://gta-clipper.vercel.app") + "/api/publish",
+        requests.post(os.environ.get("SITE_URL", "https://gta-clipper.vercel.app") + "/api/publish?force=1",
                       timeout=30)
     except Exception:
         pass

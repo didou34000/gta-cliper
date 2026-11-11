@@ -1,8 +1,12 @@
 """Planification réglée depuis le site.
 
-GitHub lance ce petit script toutes les 20 minutes (sans rien installer). Il lit le dernier
-réglage enregistré par le site dans Vercel Blob (schedule/config-<ms>.json) et décide si
-c'est l'heure d'un passage. Si oui, il note l'heure (schedule/last-run.json) et donne au
+GitHub lance ce petit script toutes les 20 minutes (sans rien installer). Il lit le réglage
+enregistré par le site dans Vercel Blob (schedule/current.json) et décide si c'est l'heure
+d'un passage.
+
+Quota : l'offre gratuite de Vercel Blob ne donne que 2 000 « opérations avancées » par mois
+(chaque envoi ou chaque liste). On ne liste donc plus rien ici : on lit deux fichiers à nom
+fixe par leur adresse publique (lecture simple, quota 10 x plus large). Si oui, il note l'heure (schedule/last-run.json) et donne au
 passage le jeu, le nombre de streamers et le nombre de clips choisis.
 
 Uniquement la bibliothèque standard : il tourne avant l'installation des dépendances.
@@ -13,6 +17,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -30,33 +35,57 @@ def _req(url: str, method: str = "GET", data: bytes | None = None, headers: dict
     return json.loads(r.read() or b"{}")
 
 
-def list_schedule() -> list[dict]:
-    q = urllib.parse.urlencode({"prefix": "schedule/", "limit": "1000"})
-    return _req(f"{API}/?{q}").get("blobs", [])
+def public_url(pathname: str) -> str:
+    """Adresse publique d'un fichier à nom fixe (même règle que @vercel/blob)."""
+    store = os.environ["BLOB_READ_WRITE_TOKEN"].split("_")[3]
+    return f"https://{store}.public.blob.vercel-storage.com/{pathname}"
 
 
-def latest_config(blobs: list[dict]) -> dict | None:
-    cfgs = sorted((b for b in blobs if b["pathname"].startswith("schedule/config-")),
-                  key=lambda b: b["uploadedAt"])
-    if not cfgs:
-        return None
-    with urllib.request.urlopen(cfgs[-1]["url"], timeout=30) as r:  # nom unique : pas de cache périmé
-        return json.loads(r.read())
+def read_json(pathname: str) -> dict | None:
+    """Lit un fichier à nom fixe. None s'il n'existe pas encore."""
+    try:
+        with urllib.request.urlopen(f"{public_url(pathname)}?t={int(time.time())}", timeout=30) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
 
 
-def last_run(blobs: list[dict]) -> datetime | None:
-    for b in blobs:
-        if b["pathname"] == "schedule/last-run.json":
-            return datetime.fromisoformat(b["uploadedAt"].replace("Z", "+00:00"))
-    return None
-
-
-def mark_run(now: datetime) -> None:
-    q = urllib.parse.urlencode({"pathname": "schedule/last-run.json"})
-    _req(f"{API}/?{q}", method="PUT", data=json.dumps({"at": now.isoformat()}).encode(),
+def write_json(pathname: str, data: dict) -> None:
+    q = urllib.parse.urlencode({"pathname": pathname})
+    _req(f"{API}/?{q}", method="PUT", data=json.dumps(data).encode(),
          headers={"x-vercel-blob-access": "public", "x-content-type": "application/json",
                   "x-add-random-suffix": "0", "x-allow-overwrite": "1",
                   "x-cache-control-max-age": "60"})
+
+
+def latest_config() -> dict | None:
+    cfg = read_json("schedule/current.json")
+    if cfg is not None:
+        return cfg
+    # Ancien format (schedule/config-<ms>.json) : une seule liste, puis on recopie le
+    # dernier réglage sous le nom fixe pour ne plus jamais avoir à lister.
+    q = urllib.parse.urlencode({"prefix": "schedule/config-", "limit": "1000"})
+    cfgs = sorted(_req(f"{API}/?{q}").get("blobs", []), key=lambda b: b["uploadedAt"])
+    if not cfgs:
+        return None
+    with urllib.request.urlopen(cfgs[-1]["url"], timeout=30) as r:
+        cfg = json.loads(r.read())
+    write_json("schedule/current.json", cfg)
+    return cfg
+
+
+def last_run() -> datetime | None:
+    d = read_json("schedule/last-run.json")
+    try:
+        return datetime.fromisoformat(d["at"]) if d and d.get("at") else None
+    except ValueError:
+        return None
+
+
+def mark_run(now: datetime) -> None:
+    write_json("schedule/last-run.json", {"at": now.isoformat()})
 
 
 def decide(cfg: dict | None, last: datetime | None, now: datetime) -> tuple[bool, str]:
@@ -76,13 +105,13 @@ def main() -> int:
         print("BLOB_READ_WRITE_TOKEN manquant : programmation impossible")
         run, why, cfg = False, "pas de stockage", None
     else:
-        blobs = list_schedule()
-        cfg = latest_config(blobs)
-        run, why = decide(cfg, last_run(blobs), now)
+        cfg = latest_config()
+        run, why = decide(cfg, last_run(), now)
         if run:
             mark_run(now)
     print(why)
-    values = {"run": "true" if run else "false"}
+    values = {"run": "true" if run else "false",
+              "off": "true" if not run and (not cfg or not cfg.get("enabled")) else "false"}
     if run and cfg:
         values |= {"jeu": str(cfg.get("game") or "Grand Theft Auto VI")[:80],
                    "top": str(int(cfg.get("top", 8))),
