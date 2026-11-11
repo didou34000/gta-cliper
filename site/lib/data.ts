@@ -1,9 +1,13 @@
 // Lecture/écriture des données dans Vercel Blob.
 //  clips/<id>/meta-*.json, clip-*.mp4, thumb-*.jpg : écrits une fois par le bot
 //  decisions/<id>/<ms>.json : chaque action faite sur le site (jamais écrasé)
-//  heartbeat/<ms>.json      : statut du bot à chaque étape (jamais écrasé)
-// On n'écrase jamais un fichier : le cache CDN de Blob ne peut donc pas servir une vieille version.
+//  heartbeat/latest.json    : statut du bot (nom fixe, écrasé à chaque étape ; lu sans cache)
+//  heartbeat/<ms>.json      : ancien format, lu seulement si latest.json n'existe pas encore
+// Quota gratuit Blob : 2 000 list()/put() par mois. La liste des clips est donc gardée en
+// cache 5 min (vidée à chaque action sur le site) et le statut du bot est lu par son adresse.
 import { del, list, put } from "@vercel/blob";
+import { revalidateTag, unstable_cache } from "next/cache";
+import { readFixed } from "./blobfile";
 
 export type Status = "pending" | "approved" | "rejected" | "posted";
 
@@ -102,6 +106,12 @@ async function getJson<T>(url: string, immutable = true): Promise<T | null> {
 
 export async function loadHeartbeat(): Promise<{ last: Heartbeat | null; history: Heartbeat[] }> {
   if (!hasStore()) return { last: null, history: [] };
+  const latest = await readFixed<Heartbeat>("heartbeat/latest.json", true);
+  if (latest !== undefined) return { last: latest, history: latest ? [latest] : [] };
+  return legacyHeartbeat();
+}
+
+const legacyHeartbeat = unstable_cache(async () => {
   const blobs = (await listAll("heartbeat/")).sort((a, b) => b.pathname.localeCompare(a.pathname));
   // Ménage : on garde les 60 derniers battements.
   const old = blobs.slice(60).map((b) => b.url);
@@ -109,15 +119,22 @@ export async function loadHeartbeat(): Promise<{ last: Heartbeat | null; history
   const recent = await Promise.all(blobs.slice(0, 1).map((b) => getJson<Heartbeat>(b.url)));
   const history = recent.filter(Boolean) as Heartbeat[];
   return { last: history[0] ?? null, history };
+}, ["heartbeat-legacy"], { revalidate: 120, tags: ["heartbeat"] });
+
+export async function loadClips(opts: { fresh?: boolean } = {}): Promise<Clip[]> {
+  return (await loadClipsAndSize(opts)).clips;
 }
 
-export async function loadClips(): Promise<Clip[]> {
-  return (await loadClipsAndSize()).clips;
-}
+const cachedClips = unstable_cache(() => readClipsAndSize(), ["clips"], { revalidate: 300, tags: ["clips"] });
 
-/** Clips + place occupée par les vidéos/miniatures dans Blob (en octets), avec les mêmes appels list. */
-export async function loadClipsAndSize(): Promise<{ clips: Clip[]; bytes: number }> {
+/** Clips + place occupée par les vidéos/miniatures dans Blob (en octets).
+ *  En cache 5 min (2 list() par lecture) ; fresh=true relit tout (publication Buffer). */
+export async function loadClipsAndSize({ fresh = false }: { fresh?: boolean } = {}): Promise<{ clips: Clip[]; bytes: number }> {
   if (!hasStore()) return { clips: [], bytes: 0 };
+  return fresh ? readClipsAndSize() : cachedClips();
+}
+
+async function readClipsAndSize(): Promise<{ clips: Clip[]; bytes: number }> {
   const [clipBlobs, decisionBlobs] = await Promise.all([listAll("clips/"), listAll("decisions/")]);
   const bytes = clipBlobs.reduce((n, b) => n + (b.size ?? 0), 0);
 
@@ -182,6 +199,7 @@ export async function deleteClip(id: string) {
     } while (cursor);
   }
   if (urls.length) await del(urls);
+  revalidateTag("clips", { expire: 0 });
 }
 
 export async function saveDecision(id: string, d: Omit<Decision, "at">) {
@@ -190,4 +208,5 @@ export async function saveDecision(id: string, d: Omit<Decision, "at">) {
   await put(`decisions/${id}/${Date.now()}.json`, JSON.stringify({ ...d, at }), {
     access: "public", contentType: "application/json", addRandomSuffix: true,
   });
+  revalidateTag("clips", { expire: 0 });
 }

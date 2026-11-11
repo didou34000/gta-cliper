@@ -91,7 +91,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
         {view === "bot" && <BotView ctx={ctx} />}
         {view === "programmation" && <ProgView ctx={ctx} launch={sp.launch} prog={sp.prog} />}
         {view === "reglages" && <SettingsView ctx={ctx} />}
-        {state.key === "running" && ["accueil", "bot", "valider"].includes(view) && <AutoRefresh seconds={15} />}
+        {state.key === "running" && ["accueil", "bot", "valider"].includes(view) && <AutoRefresh seconds={60} />}
       </main>
     </div>
   );

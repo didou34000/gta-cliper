@@ -7,7 +7,9 @@
 // Sans clé, rien ne part : les clips attendent dans « À poster » comme avant.
 import { loadClips, saveDecision, type Clip, type Networks, type NetworkState } from "./data";
 import { loadSchedule } from "./schedule";
-import { list, put } from "@vercel/blob";
+import { list } from "@vercel/blob";
+import { revalidateTag, unstable_cache } from "next/cache";
+import { readFixed, writeFixed } from "./blobfile";
 
 const API = "https://api.buffer.com";
 const MAX_SCHEDULED = 10;         // limite du plan gratuit Buffer, par réseau
@@ -24,25 +26,42 @@ const NETS = (Object.keys(CHANNELS) as Net[]).filter((n) => CHANNELS[n]);
 
 export const bufferReady = () => !!process.env.BUFFER_API_KEY;
 
-// Interrupteur « Publication auto » réglé sur le site : publish/state-<ms>.json (le plus récent gagne).
+// Interrupteur « Publication auto » réglé sur le site : publish/state.json (nom fixe).
 // Éteint par défaut : même avec la clé Buffer, rien ne part tant qu'il n'est pas allumé.
+// next_at : avant cette heure, le passage de GitHub (toutes les 20 min) n'a rien à faire et
+// ne lit même pas la liste des clips (quota Blob : 2 000 opérations avancées par mois).
+type PublishState = { enabled: boolean; next_at?: number; at?: string };
+
+async function readState(): Promise<PublishState> {
+  const cur = await readFixed<PublishState>("publish/state.json", true);
+  if (cur) return cur;
+  if (cur === null) return { enabled: false };
+  // Ancien format publish/state-<ms>.json : lu une fois puis recopié sous le nom fixe.
+  const { blobs } = await list({ prefix: "publish/state-", limit: 1000 });
+  const last = blobs.sort((a, b) => +new Date(a.uploadedAt) - +new Date(b.uploadedAt)).pop();
+  const enabled = last ? !!(await (await fetch(last.url, { cache: "no-store" })).json()).enabled : false;
+  await writeFixed("publish/state.json", { enabled, at: new Date().toISOString() }).catch(() => {});
+  return { enabled };
+}
+
+const cachedState = unstable_cache(readState, ["publish-state"], { revalidate: 3600, tags: ["publish"] });
+
 export async function publishEnabled(): Promise<boolean> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return false;
   try {
-    const { blobs } = await list({ prefix: "publish/state-", limit: 1000 });
-    if (!blobs.length) return false;
-    const last = blobs.sort((a, b) => +new Date(a.uploadedAt) - +new Date(b.uploadedAt))[blobs.length - 1];
-    const r = await fetch(last.url, { next: { revalidate: 86400 } });
-    return r.ok ? !!(await r.json()).enabled : false;
+    return !!(await cachedState()).enabled;
   } catch {
     return false;
   }
 }
 
+async function saveState(s: PublishState) {
+  await writeFixed("publish/state.json", { ...s, at: new Date().toISOString() });
+  revalidateTag("publish", { expire: 0 });
+}
+
 export async function setPublishEnabled(enabled: boolean) {
-  await put(`publish/state-${Date.now()}.json`, JSON.stringify({ enabled, at: new Date().toISOString() }), {
-    access: "public", contentType: "application/json", addRandomSuffix: true,
-  });
+  await saveState({ enabled });
 }
 
 const MUTATION = `mutation CreatePost($input: CreatePostInput!) {
@@ -96,11 +115,18 @@ async function send(net: Net, c: Clip, due: Date): Promise<NetworkState> {
 const dues = (c: Clip) =>
   Object.values(c.networks ?? {}).filter((n) => n?.state === "scheduled" && n.due).map((n) => +new Date(n!.due!));
 
-/** Envoie à Buffer les clips validés, tant qu'il reste de la place dans la file Buffer. */
-export async function publishQueue(): Promise<{ ok: boolean; sent: number; message: string }> {
+/** Envoie à Buffer les clips validés, tant qu'il reste de la place dans la file Buffer.
+ *  force=false (passage de GitHub) : ne fait rien avant next_at, pour ne pas lister les clips
+ *  toutes les 20 min alors qu'il n'y a rien à envoyer. */
+export async function publishQueue({ force = true } = {}): Promise<{ ok: boolean; sent: number; message: string }> {
   if (!bufferReady()) return { ok: false, sent: 0, message: "BUFFER_API_KEY manquante : publication auto désactivée" };
-  if (!(await publishEnabled())) return { ok: false, sent: 0, message: "Publication auto coupée sur le site" };
-  const [clips, { schedule }] = await Promise.all([loadClips(), loadSchedule()]);
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return { ok: false, sent: 0, message: "Stockage non configuré" };
+  const state = await readState();
+  if (!state.enabled) return { ok: false, sent: 0, message: "Publication auto coupée sur le site" };
+  if (!force && state.next_at && Date.now() < state.next_at) {
+    return { ok: true, sent: 0, message: `Rien à faire avant ${new Date(state.next_at).toISOString()}` };
+  }
+  const [clips, { schedule }] = await Promise.all([loadClips({ fresh: true }), loadSchedule()]);
   const now = Date.now();
   const every = Math.max(10, schedule.publish_every_min || 120) * 60_000;
 
@@ -129,5 +155,14 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
     });
     if (anyOk) { sent++; inFlight++; last = +due; }
   }
+  // Prochain contrôle utile : quand une place se libère chez Buffer s'il reste des clips
+  // validés (au plus tard dans 1 h, pour les réessais après erreur), sinon dans 24 h.
+  // Une validation sur le site ou par le bot relance tout de suite (force).
+  const left = clips.filter((c) => c.status === "approved" && c.video_url).length - sent;
+  const future = clips.flatMap(dues).filter((d) => d > Date.now());
+  const next_at = left > 0
+    ? Math.min(Date.now() + RETRY_AFTER_MS, future.length ? Math.min(...future) : Infinity)
+    : Date.now() + 24 * 3600_000;
+  await saveState({ enabled: true, next_at }).catch(() => {});
   return { ok: true, sent, message: sent ? `${sent} clip(s) programmé(s) sur Buffer` : "Rien à envoyer" };
 }
