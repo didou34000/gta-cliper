@@ -101,14 +101,17 @@ render:
 # Sous-titres animés mot par mot
 subtitles:
   font: "Montserrat Black"     # fournie dans assets/fonts (style CapCut)
-  font_size: 130
+  font_size: 92                # taille ajustée : coupe auto si la ligne dépasse le cadre
   words_per_line: 3
   color: "&H00FFFFFF"            # blanc (format ASS &HAABBGGRR)
-  highlight_color: "&H0000E6FF"  # jaune vif pour le mot prononcé
-  outline: 7
+  highlight_color: "&H00A53EFF"  # rose GTA VI (#FF3EA5) pour le mot prononcé
+  outline_color: "&H003D0A2A"    # contour violet nuit (#2A0A3D)
+  hook_bg: "&H00A53EFF"          # bandeau de l'accroche rose GTA VI
+  hook_fg: "&H00FFFFFF"          # texte de l'accroche blanc
+  outline: 6
   position_y: 1350               # hauteur des sous-titres (sur 1920)
   uppercase: true
-  hook: true                     # accroche incrustée en haut de la vidéo (bandeau blanc)
+  hook: true                     # accroche incrustée en haut de la vidéo (bandeau rose GTA VI)
   hook_y: 330                    # hauteur de l'accroche (sur 1920)
   hook_size: 104
 

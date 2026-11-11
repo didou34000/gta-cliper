@@ -25,13 +25,19 @@ def _esc(text: str) -> str:
     return text.replace("\\", "").replace("{", "(").replace("}", ")")
 
 
-def group_words(words: list[Word], per_line: int = 3, max_gap: float = 0.6) -> list[list[Word]]:
-    """Coupe en groupes courts ; coupe aussi sur ponctuation forte ou silence."""
+def group_words(words: list[Word], per_line: int = 3, max_gap: float = 0.6,
+                size: int = 0, max_width: float = 0, uppercase: bool = True) -> list[list[Word]]:
+    """Coupe en groupes courts ; coupe aussi sur ponctuation forte, silence, et dès que la
+    ligne mesurée dépasserait max_width (le mot actif grossit de 15 %, on garde la marge)."""
+    def wide(ws: list[Word]) -> float:
+        t = " ".join(w.text.upper() if uppercase else w.text for w in ws)
+        return text_width(t, size) * 1.15
     groups: list[list[Word]] = []
     cur: list[Word] = []
     for w in words:
         if cur and (len(cur) >= per_line or w.start - cur[-1].end > max_gap
-                    or cur[-1].text[-1:] in ".?!,"):
+                    or cur[-1].text[-1:] in ".?!,"
+                    or (size and max_width and wide(cur + [w]) > max_width)):
             groups.append(cur)
             cur = []
         cur.append(w)
@@ -82,8 +88,10 @@ def rounded_box(w: float, h: float, r: float) -> str:
 
 
 def build_ass(words: list[Word], out: Path, *, width: int = 1080, height: int = 1920,
-              font: str = "Montserrat Black", font_size: int = 130, per_line: int = 3,
-              color: str = "&H00FFFFFF", highlight: str = "&H0000E6FF", outline: int = 7,
+              font: str = "Montserrat Black", font_size: int = 92, per_line: int = 3,
+              color: str = "&H00FFFFFF", highlight: str = "&H00A53EFF", outline: int = 6,
+              outline_color: str = "&H003D0A2A", hook_bg: str = "&H00A53EFF",
+              hook_fg: str = "&H00FFFFFF", max_width: int = 0,
               pos_y: int = 1350, uppercase: bool = True, time_offset: float = 0.0,
               hook: str = "", hook_y: int = 330, hook_size: int = 104,
               hook_duration: float = 0.0) -> Path:
@@ -96,9 +104,9 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cap,{font},{font_size},{color},{color},&H00000000,&H64000000,0,0,0,0,100,100,1,0,1,{outline},4,5,60,60,0,1
-Style: Hook,{font},{hook_size},&H00111111,&H00111111,&H00FFFFFF,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,60,60,0,1
-Style: Box,{font},{hook_size},&H00FFFFFF,&H00FFFFFF,&H00FFFFFF,&H50000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
+Style: Cap,{font},{font_size},{color},{color},{outline_color},&H803D0A2A,0,0,0,0,100,100,1,0,1,{outline},4,5,60,60,0,1
+Style: Hook,{font},{hook_size},{hook_fg},{hook_fg},&H00FFFFFF,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,60,60,0,1
+Style: Box,{font},{hook_size},{hook_bg},{hook_bg},{hook_bg},&H50000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -128,8 +136,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 f"Dialogue: 2,{_ts(0)},{_ts(hook_duration)},Hook,,0,0,0,,"
                 "{\\an5\\pos(" + f"{cx},{y + 2}" + ")" + fade + "}" + row
             )
-    for g in group_words(words, per_line):
+    max_w = max_width or int(width * 0.84)  # ~8 % de marge de chaque côté
+    for g in group_words(words, per_line, size=font_size, max_width=max_w, uppercase=uppercase):
         texts = [_esc(w.text.upper() if uppercase else w.text) for w in g]
+        # Un mot seul trop long (ex. « INCROYABLEMENT ») : on réduit la taille de ce groupe.
+        need = text_width(" ".join(texts), font_size) * 1.15
+        fs = "" if need <= max_w else f"\\fs{int(font_size * max_w / need)}"
         g_end = g[-1].end
         for i, w in enumerate(g):
             # Le mot i est actif de son début jusqu'au début du mot suivant (pas de trou).
@@ -139,15 +151,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             for j, t in enumerate(texts):
                 if j == i:
                     parts.append(
-                        "{\\c" + highlight + "&\\fscx112\\fscy112"
-                        "\\t(0,80,\\fscx122\\fscy122)\\t(80,160,\\fscx112\\fscy112)}"
+                        "{\\c" + highlight + "&\\fscx108\\fscy108"
+                        "\\t(0,80,\\fscx115\\fscy115)\\t(80,160,\\fscx108\\fscy108)}"
                         + t + "{\\c" + color + "&\\fscx100\\fscy100}"
                     )
                 else:
                     parts.append(t)
             # Apparition du groupe : petit pop sur le premier mot seulement.
             intro = "\\fad(40,0)" if i == 0 else ""
-            text = "{\\an5\\pos(" + f"{cx},{pos_y}" + ")" + intro + "}" + " ".join(parts)
+            text = "{\\an5\\pos(" + f"{cx},{pos_y}" + ")" + intro + fs + "}" + " ".join(parts)
             lines.append(
                 f"Dialogue: 0,{_ts(start - time_offset)},{_ts(end - time_offset)},Cap,,0,0,0,,{text}"
             )
