@@ -303,3 +303,14 @@ input.title{font-weight:700;font-size:16px}
 .ev-error .ev-text{color:var(--ko);font-weight:600}
 .logs summary{cursor:pointer;font-weight:600}
 .logs pre{background:var(--bg2);padding:12px;border-radius:10px;overflow-x:auto;font-size:12px;max-height:320px;margin:12px 0 0}
+
+/* ---------- Connexion ---------- */
+.login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.login-box{width:min(360px,100%);display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:18px;background:var(--surface);border:1px solid var(--line);box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.login-box .logo{margin-bottom:10px}
+.login-box .btn-primary{margin-top:6px}
+.err{color:var(--ko);margin:0;font-size:14px}
+.side-logout{margin:0}
+.side-logout button{background:none;border:0;padding:0 10px;color:var(--dim);font:inherit;font-size:13px;cursor:pointer}
+.side-logout button:hover{color:var(--fg)}
+@media (max-width:900px){.side-logout{display:none}}
