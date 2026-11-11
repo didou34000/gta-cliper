@@ -2,6 +2,7 @@ import AltTitles from "./AltTitles";
 import CopyPost from "./CopyPost";
 import AutoRefresh from "./AutoRefresh";
 import { loadClips, loadHeartbeat, type Clip, type Status } from "@/lib/data";
+import { GAMES, REPO, STREAMERS } from "@/lib/launch";
 
 export const dynamic = "force-dynamic";
 
@@ -47,8 +48,8 @@ function scoreOf(c: Clip) {
   return { label: "Manuel", value: "—" };
 }
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const { tab: rawTab } = await searchParams;
+export default async function Home({ searchParams }: { searchParams: Promise<{ tab?: string; launch?: string }> }) {
+  const { tab: rawTab, launch } = await searchParams;
   const tab = (TABS.find((t) => t.key === rawTab)?.key ?? "pending") as Status;
   const configured = !!process.env.BLOB_READ_WRITE_TOKEN;
   const [{ last }, clips] = await Promise.all([loadHeartbeat(), loadClips()]);
@@ -81,6 +82,44 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
         <b>Bot : {stateLabel}</b>
         <span className="muted">· dernier signal {ago(last?.ts)}{last?.step ? ` · ${last.step}` : ""}{last?.message ? ` · ${last.message}` : ""}</span>
       </p>
+
+      {launch && (
+        <p className={`banner ${launch === "ok" ? "banner-ok" : ""}`}>
+          {launch === "ok" && <>Passage lancé. Le bot démarre dans 1 à 2 minutes, la frise s&apos;animera toute seule. <a href={`https://github.com/${REPO}/actions`} target="_blank" rel="noreferrer">Voir sur GitHub</a></>}
+          {launch === "notoken" && <>Bouton pas encore branché : il manque le jeton GitHub GH_DISPATCH_TOKEN sur Vercel.</>}
+          {launch === "nostreamer" && <>Choisis au moins un streamer.</>}
+          {launch.startsWith("error") && <>GitHub a refusé le lancement (code {launch.slice(5)}). Le jeton est peut-être expiré ou sans le droit « Actions ».</>}
+        </p>
+      )}
+
+      <details className="launch" open={launch === "nostreamer"}>
+        <summary>Lancer un passage maintenant</summary>
+        <form method="post" action="/api/launch" className="launch-form">
+          <fieldset>
+            <legend>Jeu</legend>
+            <select name="jeu" defaultValue={GAMES[0]}>
+              {GAMES.map((g) => <option key={g} value={g}>{g === "tous" ? "Tous les jeux" : g}</option>)}
+            </select>
+            <input name="jeu_autre" placeholder="ou un autre jeu (nom exact sur Twitch)" maxLength={80} />
+          </fieldset>
+          <fieldset>
+            <legend>Streamers</legend>
+            <div className="checks">
+              {STREAMERS.map((s) => (
+                <label key={s.login}><input type="checkbox" name="streamer" value={s.login} defaultChecked /> {s.name}</label>
+              ))}
+            </div>
+            <input name="streamers_autres" placeholder="autres logins Twitch, séparés par des virgules" maxLength={400} />
+          </fieldset>
+          <fieldset>
+            <legend>Clips max</legend>
+            <input type="number" name="max_clips" min={1} max={10} defaultValue={3} />
+          </fieldset>
+          <button type="submit" className="btn-launch" disabled={state === "running"}>
+            {state === "running" ? "Un passage est déjà en cours" : "Lancer"}
+          </button>
+        </form>
+      </details>
 
       <section className="flow" aria-label="Pipeline">
         {NODES.map((n, i) => {

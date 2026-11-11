@@ -29,7 +29,40 @@ def load_config(path: str | Path = "config.yaml") -> dict:
                      ("compute_type", "WHISPER_COMPUTE")):
         if os.environ.get(env):
             cfg["whisper"][key] = os.environ[env]
+    apply_launch_overrides(cfg, os.environ)
     return cfg
+
+
+ALL_GAMES = {"", "tous", "tous les jeux", "all", "*", "off"}
+
+
+def apply_launch_overrides(cfg: dict, env) -> dict:
+    """Choix faits au lancement manuel (site ou GitHub) : jeu et liste de streamers.
+
+    GAME_NAME : nom exact du jeu sur Twitch, ou « tous » pour ne pas filtrer.
+    STREAMERS : logins Twitch séparés par des virgules ; vide = liste du fichier de config.
+    """
+    game = (env.get("GAME_NAME") or "").strip()
+    if game:
+        if game.lower() in ALL_GAMES:
+            env_game_filter_off(cfg)
+        else:
+            cfg["game_name"] = game[:80]
+    raw = (env.get("STREAMERS") or "").strip()
+    if raw:
+        known = {st["login"].lower(): st for st in cfg.get("streamers", [])}
+        chosen = []
+        for login in re.split(r"[\s,;]+", raw.lower()):
+            login = login.strip().lstrip("@")
+            if re.fullmatch(r"[a-z0-9_]{3,25}", login) and login not in [c["login"] for c in chosen]:
+                chosen.append(known.get(login, {"login": login, "name": login.capitalize()}))
+        if chosen:
+            cfg["streamers"] = chosen[:20]
+    return cfg
+
+
+def env_game_filter_off(cfg: dict) -> None:
+    cfg["game_filter"] = False
 
 
 def slug(s: str) -> str:
@@ -216,7 +249,8 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
 
     import os
     tw = TwitchClient()
-    if os.environ.get("GAME_FILTER", "on").lower() in ("off", "0", "non", "all"):
+    if not cfg.get("game_filter", True) or \
+            os.environ.get("GAME_FILTER", "on").lower() in ("off", "0", "non", "all"):
         game_id = None
         rep.event("Filtre jeu désactivé pour ce passage : tous les jeux sont pris", node="twitch",
                   level="warn")
@@ -224,7 +258,8 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
         game_id = tw.game_id(cfg["game_name"])
     if game_id:
         rep.event(f"Jeu « {cfg['game_name']} » trouvé sur Twitch (id {game_id})", node="twitch")
-    elif os.environ.get("GAME_FILTER", "on").lower() not in ("off", "0", "non", "all"):
+    elif cfg.get("game_filter", True) and \
+            os.environ.get("GAME_FILTER", "on").lower() not in ("off", "0", "non", "all"):
         rep.event(f"Jeu « {cfg['game_name']} » introuvable sur Twitch : aucun filtre par jeu",
                   node="twitch", level="warn")
     already = seen_ids(cfg)

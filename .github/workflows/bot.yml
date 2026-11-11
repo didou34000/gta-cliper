@@ -8,11 +8,12 @@ on:
   #   - cron: "7 * * * *"   # toutes les heures (heure UTC, à la minute 7)
   workflow_dispatch:       # bouton « Run workflow » pour lancer à la main
     inputs:
-      filtre_jeu:
-        description: "Garder seulement GTA VI (on) ou tous les jeux (off)"
-        default: "on"
-        type: choice
-        options: ["on", "off"]
+      jeu:
+        description: "Jeu (nom exact sur Twitch), ou « tous » pour tous les jeux"
+        default: "Grand Theft Auto VI"
+      streamers:
+        description: "Logins Twitch séparés par des virgules (vide = liste du fichier de config)"
+        default: ""
       max_clips:
         description: "Nombre max de clips pour ce passage"
         default: "10"
@@ -35,7 +36,8 @@ jobs:
       BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
       STOP: ${{ vars.STOP }}               # variable STOP=1 : arrêt d'urgence
       WHISPER_MODEL: ${{ vars.WHISPER_MODEL || 'large-v3-turbo' }}
-      GAME_FILTER: ${{ inputs.filtre_jeu || 'on' }}
+      GAME_NAME: ${{ inputs.jeu }}
+      STREAMERS: ${{ inputs.streamers }}
       MAX_CLIPS: ${{ inputs.max_clips || '10' }}
       WHISPER_DEVICE: cpu
       WHISPER_COMPUTE: int8

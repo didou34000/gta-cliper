@@ -104,3 +104,17 @@ input.title{font-weight:700;font-size:16px}
 .ev-text{flex:1 1 260px}
 .ev-warn .ev-text{color:var(--warn)}
 .ev-error .ev-text{color:var(--ko);font-weight:600}
+/* Lancement manuel */
+.banner-ok{background:color-mix(in srgb,var(--ok) 14%,transparent);border-color:var(--ok)}
+.banner a{color:inherit;font-weight:600}
+.launch{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.launch summary{cursor:pointer;font-weight:700}
+.launch-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px;align-items:end}
+.launch-form fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;min-width:0}
+.launch-form legend{font-size:12px;color:var(--muted);padding:0;margin-bottom:4px;font-family:var(--f-mono);text-transform:uppercase;letter-spacing:.06em}
+.launch-form select{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+.checks{display:flex;flex-wrap:wrap;gap:6px 14px}
+.checks label{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--fg);margin:0;cursor:pointer}
+.checks input{width:auto;accent-color:var(--accent)}
+.btn-launch{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:700;cursor:pointer}
+.btn-launch:disabled{opacity:.5;cursor:not-allowed}
