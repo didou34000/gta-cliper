@@ -20,7 +20,8 @@ export async function POST(req: Request) {
     .map((l) => l.trim().toLowerCase().replace(/^@/, ""))
     .filter((l) => /^[a-z0-9_]{3,25}$/.test(l));
   const uniq = [...new Set(logins)].slice(0, 20);
-  if (!uniq.length) return back("nostreamer");
+  // Par défaut : les N plus gros streamers FR du jeu. Si des streamers sont cochés, on prend ceux-là.
+  const top = uniq.length ? 0 : Math.min(20, Math.max(1, parseInt(String(f.get("top") ?? "8"), 10) || 8));
 
   const n = Math.min(10, Math.max(1, parseInt(String(f.get("max_clips") ?? "3"), 10) || 3));
 
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
       "X-GitHub-Api-Version": "2022-11-28",
       "User-Agent": "gta-clipper-site",
     },
-    body: JSON.stringify({ ref: "main", inputs: { jeu, streamers: uniq.join(","), max_clips: String(n) } }),
+    body: JSON.stringify({ ref: "main", inputs: { jeu, top_streamers: String(top), streamers: uniq.join(","), max_clips: String(n) } }),
     cache: "no-store",
   });
   if (!r.ok) {

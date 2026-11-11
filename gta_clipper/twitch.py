@@ -87,6 +87,54 @@ class TwitchClient:
         data = self._get("/games", {"name": name}).get("data", [])
         return data[0]["id"] if data else None
 
+    def top_streamers(self, game_id: str | None, n: int = 8, language: str = "fr",
+                      hours: int = 48) -> list[dict]:
+        """Les N plus gros streamers d'une langue sur un jeu.
+
+        1) ceux en live en ce moment, triés par nombre de viewers ;
+        2) si ça ne suffit pas, ceux dont les clips du jeu ont fait le plus de vues
+           sur les dernières heures (utile quand peu de monde est en live).
+        Renvoie [{"login", "name", "why"}].
+        """
+        out: dict[str, dict] = {}
+        params = {"language": language, "first": 100}
+        if game_id:
+            params["game_id"] = game_id
+        for s in self._get("/streams", params).get("data", []):  # déjà triés par viewers
+            login = s["user_login"].lower()
+            if login not in out:
+                out[login] = {"login": login, "name": s["user_name"],
+                              "why": f"en live, {_n(s.get('viewer_count', 0))} viewers"}
+            if len(out) >= n:
+                return list(out.values())
+        if game_id:
+            now = datetime.now(timezone.utc)
+            views: dict[str, list] = {}
+            cp = {"game_id": game_id, "first": 100,
+                  "started_at": (now - timedelta(hours=hours)).isoformat().replace("+00:00", "Z"),
+                  "ended_at": now.isoformat().replace("+00:00", "Z")}
+            cursor = None
+            for _ in range(5):
+                if cursor:
+                    cp["after"] = cursor
+                d = self._get("/clips", cp)
+                for c in d.get("data", []):
+                    if (c.get("language") or "").lower() != language:
+                        continue
+                    name = c["broadcaster_name"]
+                    v = views.setdefault(name.lower(), [name, 0])
+                    v[1] += c.get("view_count", 0)
+                cursor = d.get("pagination", {}).get("cursor")
+                if not cursor:
+                    break
+            for login, (name, total) in sorted(views.items(), key=lambda kv: -kv[1][1]):
+                if len(out) >= n:
+                    break
+                if login not in out:
+                    out[login] = {"login": login, "name": name,
+                                  "why": f"clips du jeu : {_n(total)} vues en {hours} h"}
+        return list(out.values())
+
     def top_clips(self, broadcaster_id: str, hours: int, game_id: str | None = None,
                   min_views: int = 0, limit: int = 20) -> list[Clip]:
         """Clips créés par les viewers sur les N dernières heures, triés par vues.
@@ -143,6 +191,10 @@ class TwitchClient:
         return [Vod(id=v["id"], url=v["url"], user_login=v["user_login"], title=v["title"],
                     duration_s=parse_twitch_duration(v["duration"]), created_at=v["created_at"])
                 for v in d.get("data", [])]
+
+
+def _n(x: int) -> str:
+    return f"{x:,}".replace(",", " ")
 
 
 def dedupe_overlapping(clips: list[Clip], tolerance: int = 20) -> list[Clip]:

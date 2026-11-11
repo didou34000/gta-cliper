@@ -2,33 +2,63 @@
 # Les clés sont dans Settings > Secrets and variables > Actions (jamais dans le code).
 name: Bot GTA Clipper
 on:
-  # DÉSACTIVÉ tant qu'on n'a pas donné le feu vert. Pour lancer toutes les heures,
-  # retirer les « # » des deux lignes ci-dessous.
-  # schedule:
-  #   - cron: "7 * * * *"   # toutes les heures (heure UTC, à la minute 7)
-  workflow_dispatch:       # bouton « Run workflow » pour lancer à la main
+  # Toutes les 10 minutes, GitHub regarde la programmation réglée sur le site.
+  # Si elle est arrêtée (réglage par défaut), le contrôle s'arrête en quelques secondes
+  # sans rien lancer.
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:       # bouton « Lancer » du site, ou « Run workflow » sur GitHub
     inputs:
       jeu:
         description: "Jeu (nom exact sur Twitch), ou « tous » pour tous les jeux"
         default: "Grand Theft Auto VI"
+      top_streamers:
+        description: "Prendre les N plus gros streamers FR du jeu (0 = utiliser la liste)"
+        default: "8"
       streamers:
-        description: "Logins Twitch séparés par des virgules (vide = liste du fichier de config)"
+        description: "Logins Twitch séparés par des virgules (si top_streamers = 0)"
         default: ""
       max_clips:
         description: "Nombre max de clips pour ce passage"
-        default: "10"
-
-concurrency:
-  group: bot
-  cancel-in-progress: false  # jamais deux passages en même temps
+        default: "3"
 
 permissions:
   contents: read
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      run: ${{ steps.plan.outputs.run }}
+      jeu: ${{ steps.plan.outputs.jeu }}
+      top: ${{ steps.plan.outputs.top }}
+      max_clips: ${{ steps.plan.outputs.max_clips }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'schedule'
+      - name: Est-ce l'heure d'un passage ?
+        id: plan
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          IN_JEU: ${{ inputs.jeu }}
+          IN_TOP: ${{ inputs.top_streamers }}
+          IN_MAX: ${{ inputs.max_clips }}
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            python3 -m gta_clipper.schedule
+          else
+            { echo "run=true"; echo "jeu=$IN_JEU"; echo "top=${IN_TOP:-8}"; echo "max_clips=${IN_MAX:-3}"; } >> "$GITHUB_OUTPUT"
+          fi
+
   run:
+    needs: check
+    if: needs.check.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 50       # garde-fou : un passage bloqué est coupé
+    concurrency:
+      group: bot
+      cancel-in-progress: false  # jamais deux passages en même temps
     env:
       TWITCH_CLIENT_ID: ${{ vars.TWITCH_CLIENT_ID || '7t3dj86daadls0hj8rru2y2nuxxx2z' }}
       TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
@@ -36,9 +66,10 @@ jobs:
       BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
       STOP: ${{ vars.STOP }}               # variable STOP=1 : arrêt d'urgence
       WHISPER_MODEL: ${{ vars.WHISPER_MODEL || 'large-v3-turbo' }}
-      GAME_NAME: ${{ inputs.jeu }}
+      GAME_NAME: ${{ needs.check.outputs.jeu }}
+      TOP_STREAMERS: ${{ needs.check.outputs.top }}
       STREAMERS: ${{ inputs.streamers }}
-      MAX_CLIPS: ${{ inputs.max_clips || '10' }}
+      MAX_CLIPS: ${{ needs.check.outputs.max_clips || '3' }}
       WHISPER_DEVICE: cpu
       WHISPER_COMPUTE: int8
     steps:

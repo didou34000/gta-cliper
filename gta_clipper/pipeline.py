@@ -189,10 +189,14 @@ def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[
     if guard.stopped():
         rep.beat("idle", "Arrêt d'urgence actif", "fichier STOP présent : aucun passage")
         return []
-    for st in cfg["streamers"]:
-        rep.streamer(st["name"])
-    rep.beat("running", "Démarrage du passage",
-             f"{len(cfg['streamers'])} streamer(s) à vérifier", node="twitch")
+    import os
+    top_n = int(os.environ.get("TOP_STREAMERS") or cfg.get("top_streamers") or 0)
+    if top_n <= 0:
+        for st in cfg["streamers"]:
+            rep.streamer(st["name"])
+    what = (f"les {top_n} plus gros streamers FR sur {cfg['game_name'] if cfg.get('game_filter', True) else 'tous les jeux'}"
+            if top_n > 0 else f"{len(cfg['streamers'])} streamer(s) à vérifier")
+    rep.beat("running", "Démarrage du passage", what, node="twitch")
     try:
         out = _run(cfg, skip_llm, chat_dir, rep)
     except Exception as e:
@@ -265,6 +269,22 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
                   f"(ou choisis « Tous les jeux »). Passage arrêté.",
                   node="twitch", level="error", force=True)
         return []
+    top_n = int(os.environ.get("TOP_STREAMERS") or cfg.get("top_streamers") or 0)
+    if top_n > 0:
+        game_label = cfg["game_name"] if game_id else "tous les jeux"
+        rep.event(f"Recherche des {top_n} plus gros streamers FR sur {game_label}", node="twitch",
+                  force=True)
+        top = tw.top_streamers(game_id, n=min(top_n, 20), hours=cfg["lookback_hours"])
+        if not top:
+            rep.event(f"Aucun streamer FR trouvé sur {game_label} (ni en live, ni en clips "
+                      f"sur {cfg['lookback_hours']} h). Passage arrêté.", node="twitch",
+                      level="warn", force=True)
+            return []
+        cfg["streamers"] = [{"login": t["login"], "name": t["name"]} for t in top]
+        for t in top:
+            rep.streamer(t["name"])
+        rep.event("Streamers retenus : " + ", ".join(f"{t['name']} ({t['why']})" for t in top),
+                  node="twitch", force=True)
     already = seen_ids(cfg)
     from .remote import seen_on_site
     on_site = seen_on_site()  # clips déjà envoyés (utile quand le disque est vidé à chaque passage)

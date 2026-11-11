@@ -2,7 +2,8 @@ import AltTitles from "./AltTitles";
 import CopyPost from "./CopyPost";
 import AutoRefresh from "./AutoRefresh";
 import { loadClips, loadHeartbeat, type Clip, type Status } from "@/lib/data";
-import { DEFAULT_CHECKED, GAMES, REPO, STREAMERS } from "@/lib/launch";
+import { GAMES, REPO, STREAMERS } from "@/lib/launch";
+import { EVERY_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, loadSchedule } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,22 @@ function ago(iso?: string) {
   return `il y a ${Math.floor(h / 24)} j`;
 }
 
+function fmtMin(n: number) {
+  return n < 60 ? `${n} min` : n % 60 === 0 ? `${n / 60} h` : `${Math.floor(n / 60)} h ${n % 60}`;
+}
+
+function GameSelect({ value }: { value?: string }) {
+  const known = !value || GAMES.includes(value);
+  return (
+    <>
+      <select name="jeu" defaultValue={known ? (value ?? GAMES[0]) : GAMES[0]}>
+        {GAMES.map((g) => <option key={g} value={g}>{g === "tous" ? "Tous les jeux" : g}</option>)}
+      </select>
+      <input name="jeu_autre" placeholder="ou un autre jeu (nom exact sur Twitch)" maxLength={80} defaultValue={known ? "" : value} />
+    </>
+  );
+}
+
 const NODE_LABEL: Record<string, string> = Object.fromEntries(NODES.map((n) => [n.key, n.label]));
 
 function hhmmss(iso: string) {
@@ -48,11 +65,14 @@ function scoreOf(c: Clip) {
   return { label: "Manuel", value: "—" };
 }
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ tab?: string; launch?: string }> }) {
-  const { tab: rawTab, launch } = await searchParams;
+export default async function Home({ searchParams }: { searchParams: Promise<{ tab?: string; launch?: string; prog?: string }> }) {
+  const { tab: rawTab, launch, prog } = await searchParams;
   const tab = (TABS.find((t) => t.key === rawTab)?.key ?? "pending") as Status;
   const configured = !!process.env.BLOB_READ_WRITE_TOKEN;
-  const [{ last }, clips] = await Promise.all([loadHeartbeat(), loadClips()]);
+  const [{ last }, clips, { schedule, lastRun }] = await Promise.all([loadHeartbeat(), loadClips(), loadSchedule()]);
+  const nextRun = schedule.enabled
+    ? (lastRun ? new Date(Math.max(Date.now(), +new Date(lastRun) + schedule.every_min * 60000)) : new Date())
+    : null;
 
   const counts = Object.fromEntries(TABS.map((t) => [t.key, clips.filter((c) => c.status === t.key).length]));
   const shown = clips.filter((c) => c.status === tab);
@@ -97,19 +117,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
         <form method="post" action="/api/launch" className="launch-form">
           <fieldset>
             <legend>Jeu</legend>
-            <select name="jeu" defaultValue={GAMES[0]}>
-              {GAMES.map((g) => <option key={g} value={g}>{g === "tous" ? "Tous les jeux" : g}</option>)}
-            </select>
-            <input name="jeu_autre" placeholder="ou un autre jeu (nom exact sur Twitch)" maxLength={80} />
+            <GameSelect />
           </fieldset>
-          <fieldset className="wide">
-            <legend>Streamers ({STREAMERS.length})</legend>
-            <div className="checks">
-              {STREAMERS.map((s, i) => (
-                <label key={s.login}><input type="checkbox" name="streamer" value={s.login} defaultChecked={i < DEFAULT_CHECKED} /> {s.name}</label>
-              ))}
-            </div>
-            <input name="streamers_autres" placeholder="autres logins Twitch, séparés par des virgules" maxLength={400} />
+          <fieldset>
+            <legend>Streamers</legend>
+            <select name="top" defaultValue="8">
+              {TOP_OPTIONS.map((n) => <option key={n} value={n}>Les {n} plus gros streamers FR du jeu</option>)}
+            </select>
           </fieldset>
           <fieldset>
             <legend>Clips max</legend>
@@ -118,6 +132,62 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
           <button type="submit" className="btn-launch" disabled={state === "running"}>
             {state === "running" ? "Un passage est déjà en cours" : "Lancer"}
           </button>
+          <details className="wide manual">
+            <summary>ou choisir les streamers à la main</summary>
+            <div className="checks">
+              {STREAMERS.map((s) => (
+                <label key={s.login}><input type="checkbox" name="streamer" value={s.login} /> {s.name}</label>
+              ))}
+            </div>
+            <input name="streamers_autres" placeholder="autres logins Twitch, séparés par des virgules" maxLength={400} />
+          </details>
+        </form>
+      </details>
+
+      <details className="launch" open={prog === "ok"}>
+        <summary>
+          Programmation : {schedule.enabled
+            ? <b className="prog-on">active · toutes les {fmtMin(schedule.every_min)} · {schedule.game === "tous" ? "tous les jeux" : schedule.game} · top {schedule.top}</b>
+            : <span className="muted">arrêtée</span>}
+        </summary>
+        {prog === "ok" && <p className="muted small">Réglage enregistré. Il est pris en compte au prochain contrôle (toutes les 10 min).</p>}
+        <form method="post" action="/api/schedule" className="launch-form">
+          <fieldset>
+            <legend>Jeu</legend>
+            <GameSelect value={schedule.game} />
+          </fieldset>
+          <fieldset>
+            <legend>Streamers</legend>
+            <select name="top" defaultValue={String(schedule.top)}>
+              {TOP_OPTIONS.map((n) => <option key={n} value={n}>Les {n} plus gros FR</option>)}
+            </select>
+          </fieldset>
+          <fieldset>
+            <legend>Un passage toutes les</legend>
+            <select name="every_min" defaultValue={String(schedule.every_min)}>
+              {EVERY_OPTIONS.map((n) => <option key={n} value={n}>{fmtMin(n)}</option>)}
+            </select>
+          </fieldset>
+          <fieldset>
+            <legend>Clips max par passage</legend>
+            <input type="number" name="max_clips" min={1} max={10} defaultValue={schedule.max_clips} />
+          </fieldset>
+          <fieldset>
+            <legend>Publier un clip toutes les</legend>
+            <select name="publish_every_min" defaultValue={String(schedule.publish_every_min)}>
+              {PUBLISH_OPTIONS.map((n) => <option key={n} value={n}>{fmtMin(n)}</option>)}
+            </select>
+            <span className="muted small">Publication automatique pas encore branchée : les clips validés attendent dans « À poster ».</span>
+          </fieldset>
+          <fieldset>
+            <legend>État</legend>
+            <label className="toggle"><input type="checkbox" name="enabled" defaultChecked={schedule.enabled} /> Programmation active</label>
+            <span className="muted small">
+              {nextRun ? `Prochain passage vers ${nextRun.toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}` : "Aucun passage automatique"}
+              {lastRun ? ` · dernier ${ago(lastRun)}` : ""}
+            </span>
+          </fieldset>
+          <button type="submit" className="btn-launch">Enregistrer</button>
         </form>
       </details>
 

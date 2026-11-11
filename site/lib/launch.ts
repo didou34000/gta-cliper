@@ -1,5 +1,4 @@
 // Streamers proposés dans le formulaire de lancement (même liste que config.example.yaml).
-// Les 4 premiers sont cochés par défaut.
 export const STREAMERS: { login: string; name: string }[] = [
   { login: "squeezie", name: "Squeezie" },
   { login: "gotaga", name: "Gotaga" },
@@ -29,8 +28,6 @@ export const STREAMERS: { login: string; name: string }[] = [
   { login: "tonton", name: "Tonton" },
   { login: "mynthos", name: "Mynthos" },
 ];
-
-export const DEFAULT_CHECKED = 4;
 
 // Noms exacts des catégories Twitch. « tous » = pas de filtre par jeu.
 export const GAMES = [
