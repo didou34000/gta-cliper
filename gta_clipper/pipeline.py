@@ -83,6 +83,34 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
 
 
 def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[Path]:
+    from .remote import Reporter
+    rep = Reporter()
+    rep.beat("running", "Démarrage du passage")
+    try:
+        out = _run(cfg, skip_llm, chat_dir, rep)
+    except Exception as e:
+        log.exception("Passage interrompu")
+        rep.stats["erreurs"] += 1
+        rep.beat("error", "Passage interrompu", str(e)[:300], with_logs=True)
+        raise
+    rep.beat("idle", "Passage terminé",
+             f"{rep.stats['clips_produits']} nouveau(x) clip(s) à valider", with_logs=True)
+    return out
+
+
+def _finish(item: Path, rep, produced: list[Path]) -> None:
+    from .remote import upload_clip
+    produced.append(item)
+    rep.stats["clips_produits"] += 1
+    try:
+        upload_clip(item)
+    except Exception as e:
+        rep.stats["erreurs"] += 1
+        log.warning("Clip prêt en local mais pas envoyé sur le site : %s", e)
+    rep.beat("running", "Clip prêt", item.name)
+
+
+def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
     from .twitch import TwitchClient, fetch_chat_offsets_gql, load_chat_offsets
 
     tw = TwitchClient()
@@ -103,19 +131,22 @@ def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[
         clips = tw.top_clips(uid, cfg["lookback_hours"], game_id, cfg["min_clip_views"],
                              cfg["max_clips_per_streamer"])
         log.info("%s : %d clip(s) retenu(s)", st["name"], len(clips))
+        rep.stats["clips_trouves"] += len(clips)
+        rep.beat("running", f"Clips de {st['name']}", f"{len(clips)} clip(s) au-dessus du seuil")
         for c in clips:
             sid = f"clip-{c.id}"
             if sid in already:
                 continue
             try:
                 video = media.download(c.url, work / sid / "source.mp4")
-                produced.append(process_clip(
+                _finish(process_clip(
                     cfg, source_id=sid, streamer_name=st["name"], video=video,
                     twitch_title=c.title, source_url=c.url, skip_llm=skip_llm,
-                    extra={"views": c.view_count, "kind": "twitch_clip"}))
+                    extra={"views": c.view_count, "kind": "twitch_clip"}), rep, produced)
                 already.add(sid)
             except Exception:
                 log.exception("Échec sur le clip %s", c.url)
+                rep.stats["erreurs"] += 1
 
         # 2) Pics de chat dans la dernière VOD (optionnel)
         vc = cfg.get("vod", {})
@@ -138,12 +169,13 @@ def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[
                     continue
                 try:
                     video = media.download(v.url, work / sid / "source.mp4", h.start, h.end)
-                    produced.append(process_clip(
+                    _finish(process_clip(
                         cfg, source_id=sid, streamer_name=st["name"], video=video,
                         twitch_title=v.title, source_url=f"{v.url}?t={int(h.start)}s",
                         skip_llm=skip_llm,
-                        extra={"kind": "vod_chat_spike", "chat_zscore": h.score}))
+                        extra={"kind": "vod_chat_spike", "chat_zscore": h.score}), rep, produced)
                     already.add(sid)
                 except Exception:
                     log.exception("Échec sur le moment %s", sid)
+                    rep.stats["erreurs"] += 1
     return produced

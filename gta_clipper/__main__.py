@@ -26,6 +26,8 @@ def main() -> None:
     lo.add_argument("--no-llm", action="store_true")
     lo.add_argument("--words", help="Transcription déjà faite (JSON) au lieu de Whisper")
 
+    sub.add_parser("site-test", help="Envoie un statut + le dernier clip local au site, pour tester la liaison")
+
     rv = sub.add_parser("review", help="Lance l'interface de validation")
     rv.add_argument("--port", type=int, default=5000)
     rv.add_argument("--host", default="127.0.0.1")
@@ -50,7 +52,24 @@ def main() -> None:
         d = process_clip(cfg, source_id=f"local-{video.stem}", streamer_name=a.streamer,
                          video=video, source_url=src if src.startswith("http") else "",
                          skip_llm=a.no_llm, words=words)
-        print(f"Prêt à valider : {d}")
+        from .remote import enabled, upload_clip
+        if enabled():
+            upload_clip(d)
+            print(f"Prêt à valider (en local et sur le site) : {d}")
+        else:
+            print(f"Prêt à valider (en local uniquement, BLOB_READ_WRITE_TOKEN absent) : {d}")
+    elif a.cmd == "site-test":
+        from .remote import Reporter, enabled, upload_clip
+        if not enabled():
+            raise SystemExit("BLOB_READ_WRITE_TOKEN absent : récupère-le dans Vercel > Storage.")
+        rep = Reporter()
+        rep.beat("idle", "Test de liaison", "Le bot arrive à parler au site")
+        items = sorted(Path(cfg["paths"]["review"]).glob("*/meta.json"))
+        if items:
+            upload_clip(items[-1].parent)
+            print(f"Statut et clip envoyés ({items[-1].parent.name}). Recharge le site.")
+        else:
+            print("Statut envoyé. Aucun clip local à envoyer (lance d'abord la commande local).")
     elif a.cmd == "review":
         from .review import create_app
         print(f"Interface de validation : http://{a.host}:{a.port}")

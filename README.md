@@ -51,6 +51,10 @@ python -m gta_clipper local https://www.twitch.tv/videos/123456 --start 3600 --e
 python -m gta_clipper local ma_video.mp4 --streamer Squeezie
 ```
 
+## Site de suivi
+
+Le dossier `site/` contient le tableau de bord privé (Vercel) : statut du bot en direct, clips scorés, validation, clips à poster et publiés, frise explicative. Voir `site/README.md` pour la mise en ligne. Une fois `BLOB_READ_WRITE_TOKEN` défini sur le PC du bot, chaque passage envoie ses clips et son statut au site ; la validation se fait alors sur le site (l'interface locale `review` reste disponible).
+
 ## Détection des moments forts
 
 1. **Clips viewers Twitch** (activé par défaut) : les clips les plus vus du streamer sur la période, filtrés sur GTA VI, dédoublonnés quand plusieurs viewers ont clippé le même moment. C'est le signal le plus fiable.

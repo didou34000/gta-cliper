@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pipeline GTA VI Clipper</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: une piste verticale de montage ; chaque étape = un "clip" posé sur la piste, avec le fichier qu'elle produit */
+:root{
+  --bg:#f6f4f7; --surface:#ffffff; --fg:#1d1a22; --muted:#6b6474; --line:#ddd7e2;
+  --accent:#d6336c; --accent2:#f08c2b; --ok:#2f9e6b; --warn:#b7791f; --code:#efeaf2;
+  --f-display:"Anton","Impact","Arial Narrow",sans-serif;
+  --f-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141218; --surface:#1d1a23; --fg:#efeaf3; --muted:#a39bad; --line:#332e3b;
+  --accent:#f06595; --accent2:#ffa94d; --ok:#51cf8f; --warn:#f2c14e; --code:#26222d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141218; --surface:#1d1a23; --fg:#efeaf3; --muted:#a39bad; --line:#332e3b;
+  --accent:#f06595; --accent2:#ffa94d; --ok:#51cf8f; --warn:#f2c14e; --code:#26222d; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:40px 64px}
+.wrap{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{text-wrap:balance;margin:0}
+header{display:flex;flex-direction:column;gap:12px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(40px,8vw,72px);line-height:1;letter-spacing:.01em;text-transform:uppercase}
+h1 .hl{color:var(--accent2)}
+.lead{color:var(--muted);max-width:62ch;margin:0}
+code,.mono{font-family:var(--f-mono);font-size:.85em}
+code{background:var(--code);padding:1px 6px;border-radius:4px}
+
+/* Piste */
+.track{position:relative;display:flex;flex-direction:column;gap:28px;padding-left:56px}
+.track::before{content:"";position:absolute;left:19px;top:8px;bottom:8px;width:3px;border-radius:2px;
+  background:linear-gradient(var(--accent),var(--accent2))}
+.step{position:relative;display:flex;flex-direction:column;gap:12px}
+.num{position:absolute;left:-56px;top:0;width:41px;height:41px;border-radius:50%;background:var(--bg);
+  border:3px solid var(--accent);display:grid;place-items:center;font-family:var(--f-display);font-size:20px;color:var(--fg)}
+.step.key .num{background:var(--accent);color:#fff}
+.step-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px}
+h2{font-family:var(--f-display);font-weight:400;font-size:28px;letter-spacing:.02em;text-transform:uppercase;line-height:1.1}
+.out{font-family:var(--f-mono);font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+.step p{margin:0;max-width:65ch}
+.step ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;max-width:65ch}
+.tool{color:var(--muted);font-size:14px}
+
+/* Bloc scoring */
+.scoring{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:20px}
+.lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:20px}
+.lane{display:flex;flex-direction:column;gap:10px;min-width:0}
+.lane h3{font-size:16px;font-weight:700;display:flex;gap:8px;align-items:center}
+.tag{font-family:var(--f-mono);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:4px}
+.tag.on{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.tag.opt{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.rules{display:flex;flex-direction:column;gap:0;margin:0;padding:0;list-style:none;border-top:1px solid var(--line)}
+.rules li{display:grid;grid-template-columns:110px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.rules li b{font-family:var(--f-mono);font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
+.formula{font-family:var(--f-mono);font-size:13px;background:var(--code);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:nowrap}
+figure{margin:0;display:flex;flex-direction:column;gap:6px}
+.chart{overflow-x:auto}
+.chart svg{display:block;width:100%;min-width:520px;height:auto}
+figcaption{font-size:13px;color:var(--muted)}
+
+/* Démo sous-titres */
+.caption-demo{background:#000;border-radius:10px;padding:22px 12px;text-align:center;font-family:var(--f-display);
+  font-size:clamp(26px,6vw,38px);letter-spacing:.02em;color:#fff;-webkit-text-stroke:1.5px #000;
+  text-shadow:0 3px 0 #000,0 0 6px #000}
+.caption-demo span{display:inline-block;margin:0 .15em;transition:transform .08s,color .08s}
+.caption-demo span.act{color:#ffe100;transform:scale(1.12)}
+@media (prefers-reduced-motion: reduce){.caption-demo span{transition:none}}
+
+.note{border-left:3px solid var(--warn);padding:4px 0 4px 16px;display:flex;flex-direction:column;gap:8px}
+.note h3{font-size:16px}
+.note ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;max-width:65ch}
+footer{color:var(--muted);font-size:13px}
+@media (max-width:480px){
+  .track{padding-left:44px}.track::before{left:14px}
+  .num{left:-44px;width:31px;height:31px;font-size:16px;border-width:2px}
+  h2{font-size:23px}
+  .rules li{grid-template-columns:1fr;gap:2px}
+}
+</style>
+<style>body{margin:0}.back{display:inline-block;margin-bottom:8px;color:var(--muted);font-size:14px;text-decoration:none}.back:hover{color:var(--fg)}</style>
+</head><body>
+
+<div class="wrap">
+<header><a class="back" href="/">← Tableau de bord</a>
+  <span class="eyebrow">Clips GTA VI · streamers FR</span>
+  <h1>Du live Twitch au <span class="hl">Short prêt à poster</span></h1>
+  <p class="lead">Chaque étape du pipeline, dans l'ordre où elle tourne, avec le fichier qu'elle produit. L'étape 2 détaille comment un moment est choisi et noté.</p>
+</header>
+
+<section class="track" aria-label="Étapes du pipeline">
+
+  <article class="step">
+    <div class="num">1</div>
+    <div class="step-head"><h2>Surveiller les streamers</h2><span class="out">config.yaml</span></div>
+    <p>Le pipeline tourne toutes les heures (tâche planifiée). Pour chaque streamer de ta liste, il interroge l'API officielle de Twitch : clips des 48 dernières heures et dernière VOD.</p>
+    <span class="tool">Outil : API Twitch Helix</span>
+  </article>
+
+  <article class="step key">
+    <div class="num">2</div>
+    <div class="step-head"><h2>Choisir et noter les moments forts</h2><span class="out">liste de candidats</span></div>
+    <p>Deux sources de moments, chacune avec son propre score.</p>
+
+    <div class="scoring">
+      <div class="lanes">
+        <div class="lane">
+          <h3>A. Clips des viewers <span class="tag on">Actif</span></h3>
+          <p style="font-size:14px;margin:0">Si un viewer a pris la peine de clipper, c'est qu'il s'est passé quelque chose. C'est le signal le plus fiable.</p>
+          <ul class="rules">
+            <li><b>Filtre jeu</b><span>Uniquement les clips catégorie Grand Theft Auto VI</span></li>
+            <li><b>Période</b><span>48 dernières heures</span></li>
+            <li><b>Seuil</b><span>200 vues minimum</span></li>
+            <li><b>Score</b><span>Nombre de vues du clip</span></li>
+            <li><b>Doublons</b><span>Même moment clippé par plusieurs viewers (moins de 20 s d'écart) : on garde le plus vu</span></li>
+            <li><b>Quota</b><span>Les 5 meilleurs par streamer</span></li>
+          </ul>
+        </div>
+        <div class="lane">
+          <h3>B. Pics de chat dans la VOD <span class="tag opt">Option</span></h3>
+          <p style="font-size:14px;margin:0">Trouve les moments que personne n'a clippés, en repérant quand le chat s'emballe.</p>
+          <ul class="rules">
+            <li><b>Mesure</b><span>Messages comptés par fenêtre de 30 s</span></li>
+            <li><b>Référence</b><span>Moyenne et écart-type des 10 min autour, pour qu'un live calme ou très actif ne fausse rien</span></li>
+            <li><b>Seuil</b><span>z ≥ 3 et au moins 10 messages</span></li>
+            <li><b>Décalage</b><span>Le chat réagit après l'action : on recule de 8 s</span></li>
+            <li><b>Découpe</b><span>28 s avant le pic, 17 s après (45 s)</span></li>
+            <li><b>Quota</b><span>8 par VOD, les plus forts d'abord, sans chevauchement</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="formula">z = (messages dans la fenêtre − moyenne des 10 min) ÷ écart-type des 10 min</div>
+
+      <figure>
+        <div class="chart">
+          <svg viewBox="0 0 640 220" role="img" aria-label="Exemple : nombre de messages par fenêtre, avec un pic au-dessus du seuil z égal 3">
+            <g font-family="JetBrains Mono, monospace" font-size="11">
+              <line x1="48" y1="180" x2="624" y2="180" stroke="var(--line)" stroke-width="1"/>
+              <line x1="48" y1="20" x2="48" y2="180" stroke="var(--line)" stroke-width="1"/>
+              <text x="40" y="184" text-anchor="end" fill="var(--muted)">0</text>
+              <text x="40" y="104" text-anchor="end" fill="var(--muted)">40</text>
+              <text x="40" y="24" text-anchor="end" fill="var(--muted)">80</text>
+              <line x1="48" y1="100" x2="624" y2="100" stroke="var(--line)" stroke-dasharray="2 4"/>
+              <!-- seuil z=3 à 58 messages => y = 180 - 58*2 = 64 -->
+              <line x1="48" y1="64" x2="624" y2="64" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="6 4"/>
+              <text x="620" y="58" text-anchor="end" fill="var(--accent)">seuil z = 3</text>
+              <g id="bars"></g>
+              <text x="336" y="200" text-anchor="middle" fill="var(--muted)">minutes du live →</text>
+              <text x="380" y="30" fill="var(--fg)" font-weight="600">pic : z = 7,5</text>
+              <line x1="378" y1="34" x2="366" y2="46" stroke="var(--fg)"/>
+            </g>
+          </svg>
+        </div>
+        <figcaption>Exemple simulé (données de test, pas un vrai live) : seul le pic qui dépasse la ligne devient un clip.</figcaption>
+      </figure>
+    </div>
+  </article>
+
+  <article class="step">
+    <div class="num">3</div>
+    <div class="step-head"><h2>Télécharger</h2><span class="out">source.mp4</span></div>
+    <p>Le clip est téléchargé en 1080p maximum. Pour une VOD, seule la section du moment fort est récupérée, pas le live entier. Un moment déjà traité n'est jamais refait.</p>
+    <span class="tool">Outil : yt-dlp</span>
+  </article>
+
+  <article class="step">
+    <div class="num">4</div>
+    <div class="step-head"><h2>Transcrire mot à mot</h2><span class="out">transcript.json</span></div>
+    <p>Transcription en français avec l'heure exacte de début et de fin de chaque mot, ce qui permet de synchroniser les sous-titres. Les silences sont ignorés. Le clip est limité à 60 s.</p>
+    <span class="tool">Outil : faster-whisper (modèle large-v3)</span>
+  </article>
+
+  <article class="step">
+    <div class="num">5</div>
+    <div class="step-head"><h2>Passer en vertical 9:16</h2><span class="out">1080 × 1920</span></div>
+    <ul>
+      <li><b>Flou</b> (par défaut) : le jeu entier au centre, le même plan flouté en fond. Rien n'est coupé.</li>
+      <li><b>Zoom</b> : plein écran sur le centre de l'image.</li>
+      <li><b>Facecam</b> : la webcam du streamer en haut, le jeu en dessous (coordonnées à régler une fois par streamer).</li>
+    </ul>
+    <span class="tool">Outil : ffmpeg</span>
+  </article>
+
+  <article class="step">
+    <div class="num">6</div>
+    <div class="step-head"><h2>Incruster les sous-titres</h2><span class="out">subs.ass → clip.mp4</span></div>
+    <p>3 mots à l'écran, en majuscules. Le mot prononcé passe en jaune avec un « pop » de 160 ms. Une ligne change sur un silence de plus de 0,6 s ou sur une ponctuation.</p>
+    <div class="caption-demo" id="cap" aria-hidden="true"><span>C'EST</span><span class="act">QUOI</span><span>CE</span></div>
+    <span class="tool">Outil : libass via ffmpeg</span>
+  </article>
+
+  <article class="step">
+    <div class="num">7</div>
+    <div class="step-head"><h2>Écrire titre, description, hashtags</h2><span class="out">meta.json</span></div>
+    <p>Claude lit la transcription et propose un titre centré sur le streamer et l'action (« Squeezie découvre le manoir »), 2 titres alternatifs, une description et 5 à 8 hashtags, plus #GTA6 #GTAVI #GTA.</p>
+    <p>Règle imposée : le titre doit décrire ce qui se passe vraiment dans le clip. Si la transcription ne suffit pas, l'IA reste générale et le clip est marqué « titre peu sûr ».</p>
+    <span class="tool">Outil : Claude Opus 5.5</span>
+  </article>
+
+  <article class="step key">
+    <div class="num">8</div>
+    <div class="step-head"><h2>Valider à la main</h2><span class="out">post.txt</span></div>
+    <p>Sur la page de validation, tu regardes le clip, tu corriges ou changes le titre, puis tu cliques Valider ou Rejeter. Un clip validé part dans <code>data/approved/</code> avec la vidéo et un texte prêt à coller sur TikTok, Shorts ou Reels. Rien n'est publié sans toi.</p>
+  </article>
+</section>
+
+<aside class="note">
+  <h3>Ce que le scoring ne fait pas encore</h3>
+  <ul>
+    <li>Les deux sources ne sont pas fusionnées en un score unique : un clip viewer à 5 000 vues et un pic de chat à z = 6 ne sont pas comparés entre eux.</li>
+    <li>Le contenu du clip n'est pas jugé : rien ne mesure si c'est drôle, s'il y a un cri ou un fou rire. On peut ajouter un score basé sur l'audio (volume, rires) et sur la transcription.</li>
+    <li>Le pipeline n'a pas encore tourné sur de vrais clips Twitch : les seuils (200 vues, z ≥ 3) sont des valeurs de départ à ajuster après les premiers essais.</li>
+  </ul>
+</aside>
+
+<footer>Les valeurs indiquées sont celles du fichier config.example.yaml et se modifient dans config.yaml.</footer>
+</div>
+
+<script>
+(function(){
+  // Barres de l'exemple : base ~20-35 messages, pic à la minute ~30
+  var vals=[22,25,19,28,24,30,26,21,27,33,29,24,26,31,35,28,25,30,27,38,76,62,34,27,25,29,23,26,30,28,24,27,31,26,22,29];
+  var g=document.getElementById('bars'), x0=52, w=(620-x0)/vals.length, NS='http://www.w3.org/2000/svg';
+  vals.forEach(function(v,i){
+    var r=document.createElementNS(NS,'rect'), h=v*2;
+    r.setAttribute('x',(x0+i*w+1).toFixed(1)); r.setAttribute('y',180-h);
+    r.setAttribute('width',(w-3).toFixed(1)); r.setAttribute('height',h); r.setAttribute('rx',2);
+    r.setAttribute('fill', v>=58 ? 'var(--accent)' : 'var(--muted)');
+    r.setAttribute('fill-opacity', v>=58 ? '1' : '0.45');
+    g.appendChild(r);
+  });
+  // Démo sous-titres : le mot actif avance
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var lines=[["C'EST","QUOI","CE"],["MANOIR","DE","FOU"],["REGARDE","LA","PISCINE"],["Y'A","UN","HÉLICO"]];
+  var cap=document.getElementById('cap'), li=0, wi=1;
+  setInterval(function(){
+    wi++; if(wi>2){wi=0; li=(li+1)%lines.length;}
+    cap.innerHTML=lines[li].map(function(t,j){return '<span'+(j===wi?' class="act"':'')+'>'+t+'</span>';}).join('');
+  },420);
+})();
+</script>
+</body></html>
