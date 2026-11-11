@@ -35,6 +35,22 @@ class Ranking(BaseModel):
     scores: list[Score]
 
 
+def _fetch_thumb(url: str) -> str:
+    """Miniature Twitch en base64. On la télécharge nous-mêmes : l'API Anthropic refuse
+    de la récupérer par URL (robots.txt de Twitch)."""
+    if not url:
+        return ""
+    try:
+        import base64
+        import requests
+        r = requests.get(url, timeout=10)
+        if r.ok and r.headers.get("content-type", "").startswith("image/jpeg") and len(r.content) < 2_000_000:
+            return base64.b64encode(r.content).decode()
+    except Exception as e:
+        log.info("Miniature indisponible (%s) : %s", url[:80], e)
+    return ""
+
+
 def rank_candidates(cands: list[dict], game: str = "", model: str = "claude-haiku-5-5") -> list[dict]:
     """Ajoute 'score' et 'raison' à chaque candidat et renvoie la liste triée (meilleur d'abord).
 
@@ -53,8 +69,10 @@ def rank_candidates(cands: list[dict], game: str = "", model: str = "claude-haik
         content.append({"type": "text", "text":
                         f"[{i}] {c['streamer']} · {c['views']} vues · {c['duration']:.0f} s · "
                         f"titre : {c['title'] or '(vide)'}"})
-        if c.get("thumb"):
-            content.append({"type": "image", "source": {"type": "url", "url": c["thumb"]}})
+        img = _fetch_thumb(c.get("thumb", ""))
+        if img:
+            content.append({"type": "image", "source": {
+                "type": "base64", "media_type": "image/jpeg", "data": img}})
     try:
         client = anthropic.Anthropic(max_retries=2, timeout=60)
         resp = client.messages.parse(
