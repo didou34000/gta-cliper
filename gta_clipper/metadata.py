@@ -10,8 +10,14 @@ SYSTEM = """Tu écris les métadonnées de clips courts (TikTok, YouTube Shorts,
 pour une page de clips de streamers français (jeu indiqué dans le message).
 
 Règles du titre :
-- Format accrocheur centré sur le streamer et l'action : "Squeezie découvre le manoir", \
-"Gotaga se fait braquer en 10 secondes", "ZeratoR tombe sur le pire PNJ du jeu".
+- Accrocheur ET explicatif : on doit comprendre en lisant le titre seul ce que la vidéo \
+montre (quoi, dans quel jeu), puis avoir envie de cliquer. Formule : streamer + action \
+précise + objet concret + jeu. Exemples : "Squeezie découvre les stations essence sur GTA 6", \
+"Gotaga teste la voiture la plus rapide de GTA 6", "ZeratoR découvre que les PNJ se souviennent \
+de lui sur GTA 6", "Gotaga se fait braquer en 10 secondes sur GTA 6".
+- Nomme l'élément concret découvert ou montré (voiture, essence, arme, quartier, PNJ, \
+mécanique, police, météo, animaux…) plutôt qu'un mot vague ("un truc", "quelque chose de fou").
+- Mets le nom du jeu dans le titre (ex. "sur GTA 6") quand il tient dans la limite.
 - 70 caractères max, en français naturel, sans guillemets, 0 ou 1 emoji.
 - Le titre doit décrire ce qui se passe VRAIMENT dans la transcription. \
 N'invente pas d'événement, de lieu ou de réaction absents du contenu. \
@@ -29,7 +35,7 @@ Comprendre le clip AVANT d'écrire : à partir des images (prises à intervalles
 Accroche (hook) : le texte incrusté EN HAUT de la vidéo, lu en une seconde.
 - 3 à 7 mots, 40 caractères max, sans emoji, sans hashtag, sans guillemets.
 - Elle dit ce qui se passe et donne envie de rester jusqu'à la fin. Formules qui marchent : "IL CLUTCH UN 1V4 IMPOSSIBLE", "IL DÉCOUVRE LE SECRET DU MANOIR", "LA PIRE MORT DE L'HISTOIRE", "IL NE S'ATTENDAIT PAS À ÇA", "SQUEEZIE PÈTE UN CÂBLE", "CE BUG L'A TRAUMATISÉ", "ATTENDS LA FIN…".
-- Concrète plutôt que vague : "IL VOLE UN TANK EN PLEINE VILLE" vaut mieux que "MOMENT INCROYABLE". Un chiffre ou un détail précis (1v4, 10 secondes, 3 étoiles) aide.
+- Concrète et explicative plutôt que vague : on comprend le sujet de la vidéo rien qu'en la lisant. "IL DÉCOUVRE L'ESSENCE SUR GTA 6", "LA VOITURE LA PLUS RAPIDE DE GTA 6", "IL VOLE UN TANK EN PLEINE VILLE" valent mieux que "MOMENT INCROYABLE" ou "IL DÉCOUVRE UN TRUC FOU". Un chiffre ou un détail précis (1v4, 10 secondes, 3 étoiles) aide.
 - Vraie : elle décrit ce que montrent les images ou la transcription, jamais un événement inventé. Si tu ne comprends pas ce qui se passe, une accroche de curiosité honnête ("SA RÉACTION VAUT TOUT") plutôt qu'une invention, et confidence à "low".
 
 Corrections : la transcription vient d'une reconnaissance vocale automatique et contient \
