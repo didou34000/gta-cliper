@@ -26,7 +26,7 @@ def build_filter(layout: str, W: int, H: int, facecam: dict | None, ass_name: st
             f"[b]scale={W}:-2[fg];"
             f"[bg][fg]overlay=(W-w)/2:(H-h)/2[v0]"
         )
-    return g + f";[v0]ass={ass_name},setsar=1,format=yuv420p[v]"
+    return g + f";[v0]ass={ass_name}:fontsdir=fonts,setsar=1,format=yuv420p[v]"
 
 
 def render_vertical(src: Path, ass: Path, out: Path, *, width: int = 1080, height: int = 1920,
@@ -38,6 +38,10 @@ def render_vertical(src: Path, ass: Path, out: Path, *, width: int = 1080, heigh
     ass_local = workdir / "subs.ass"
     if ass.resolve() != ass_local.resolve():
         shutil.copy(ass, ass_local)
+    # Polices fournies avec le bot (Montserrat, style CapCut), lues par libass.
+    from .subtitles import FONTS_DIR
+    if FONTS_DIR.is_dir():
+        shutil.copytree(FONTS_DIR, workdir / "fonts", dirs_exist_ok=True)
     fg = build_filter(layout, width, height, facecam, "subs.ass")
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
     if start:

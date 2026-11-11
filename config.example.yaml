@@ -92,17 +92,17 @@ render:
 
 # Sous-titres animés mot par mot
 subtitles:
-  font: "DejaVu Sans"           # présente sur les serveurs GitHub ; mets "Arial Black" sur Mac
-  font_size: 92
+  font: "Montserrat Black"     # fournie dans assets/fonts (style CapCut)
+  font_size: 130
   words_per_line: 3
   color: "&H00FFFFFF"            # blanc (format ASS &HAABBGGRR)
-  highlight_color: "&H0000E1FF"  # jaune/orange pour le mot prononcé
-  outline: 6
+  highlight_color: "&H0000E6FF"  # jaune vif pour le mot prononcé
+  outline: 7
   position_y: 1350               # hauteur des sous-titres (sur 1920)
   uppercase: true
   hook: true                     # accroche incrustée en haut de la vidéo (bandeau blanc)
   hook_y: 330                    # hauteur de l'accroche (sur 1920)
-  hook_size: 76
+  hook_size: 104
 
 # Transcription
 whisper:

@@ -9,6 +9,9 @@ from pathlib import Path
 
 from .media import Word
 
+FONTS_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
+EM = 0.644  # taille réelle du cadratin Montserrat par point ASS (libass)
+
 
 def _ts(t: float) -> str:
     t = max(0.0, t)
@@ -37,25 +40,52 @@ def group_words(words: list[Word], per_line: int = 3, max_gap: float = 0.6) -> l
     return groups
 
 
-def wrap_hook(text: str, max_chars: int = 18) -> list[str]:
-    """Coupe l'accroche en 1 à 3 lignes équilibrées (libass ne coupe pas avec WrapStyle 2)."""
+def wrap_hook(text: str, max_chars: int = 18, size: int = 0, max_width: float = 880) -> list[str]:
+    """Coupe l'accroche en 1 à 3 lignes (libass ne coupe pas avec WrapStyle 2).
+
+    Avec size > 0, coupe selon la largeur réelle du texte dans la police ; sinon en caractères.
+    """
+    too_long = ((lambda t: text_width(t, size) > max_width) if size
+                else (lambda t: len(t) > max_chars))
     words, lines, cur = text.split(), [], ""
     for w in words:
-        if cur and len(cur) + 1 + len(w) > max_chars:
+        nxt = f"{cur} {w}".strip()
+        if cur and too_long(nxt):
             lines.append(cur)
             cur = w
         else:
-            cur = f"{cur} {w}".strip()
+            cur = nxt
     if cur:
         lines.append(cur)
     return lines[:3]
 
 
+def text_width(text: str, size: int, font_file: str = "Montserrat-Black.ttf") -> float:
+    """Largeur du texte en pixels (police fournie dans assets/fonts), estimation sinon."""
+    try:
+        from PIL import ImageFont
+        # libass dimensionne la police sur sa hauteur de ligne Windows, pas sur le cadratin :
+        # pour Montserrat, 1 point ASS = 0,644 px de cadratin (mesuré sur un rendu libass).
+        return ImageFont.truetype(str(FONTS_DIR / font_file), 100).getlength(text) * size * EM / 100
+    except Exception:
+        return len(text) * size * 0.4
+
+
+def rounded_box(w: float, h: float, r: float) -> str:
+    """Rectangle aux coins arrondis en dessin ASS (\\p1), origine en haut à gauche."""
+    w, h, r = round(w), round(h), round(min(r, h / 2, w / 2))
+    k = round(r * 0.45)  # poignées de Bézier ≈ quart de cercle
+    return (f"m {r} 0 l {w - r} 0 b {w - k} 0 {w} {k} {w} {r} "
+            f"l {w} {h - r} b {w} {h - k} {w - k} {h} {w - r} {h} "
+            f"l {r} {h} b {k} {h} 0 {h - k} 0 {h - r} "
+            f"l 0 {r} b 0 {k} {k} 0 {r} 0")
+
+
 def build_ass(words: list[Word], out: Path, *, width: int = 1080, height: int = 1920,
-              font: str = "Montserrat ExtraBold", font_size: int = 92, per_line: int = 3,
-              color: str = "&H00FFFFFF", highlight: str = "&H0000E1FF", outline: int = 6,
+              font: str = "Montserrat Black", font_size: int = 130, per_line: int = 3,
+              color: str = "&H00FFFFFF", highlight: str = "&H0000E6FF", outline: int = 7,
               pos_y: int = 1350, uppercase: bool = True, time_offset: float = 0.0,
-              hook: str = "", hook_y: int = 330, hook_size: int = 76,
+              hook: str = "", hook_y: int = 330, hook_size: int = 104,
               hook_duration: float = 0.0) -> Path:
     header = f"""[Script Info]
 ScriptType: v4.00+
@@ -66,8 +96,9 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cap,{font},{font_size},{color},{color},&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,{outline},3,5,60,60,0,1
-Style: Hook,{font},{hook_size},&H00000000,&H00000000,&H00FFFFFF,&H64000000,-1,0,0,0,100,100,0,0,3,18,0,5,60,60,0,1
+Style: Cap,{font},{font_size},{color},{color},&H00000000,&H64000000,0,0,0,0,100,100,1,0,1,{outline},4,5,60,60,0,1
+Style: Hook,{font},{hook_size},&H00111111,&H00111111,&H00FFFFFF,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,60,60,0,1
+Style: Box,{font},{hook_size},&H00FFFFFF,&H00FFFFFF,&H00FFFFFF,&H50000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -75,15 +106,27 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     lines = []
     cx = width // 2
     if hook and hook_duration > 0:
-        # Accroche en haut : texte noir sur bandeau blanc, une ligne de bandeau par ligne
-        # de texte (comme les titres TikTok), visible pendant tout le clip.
-        rows = wrap_hook(_esc(hook.upper()))
-        step = int(hook_size * 1.32)
+        # Accroche en haut, façon titre TikTok/CapCut : texte noir, un bandeau blanc
+        # aux coins arrondis par ligne (largeur ajustée au texte), visible tout le clip.
+        rows = wrap_hook(_esc(hook.upper()), size=hook_size)
+        em = hook_size * EM
+        box_h = int(em * 1.5)
+        step = box_h - 2  # les bandeaux se touchent, comme dans CapCut
+        pad = int(em * 0.5)
         y0 = hook_y - step * (len(rows) - 1) // 2
+        fade = "\\fad(150,0)"
         for k, row in enumerate(rows):
+            y = y0 + k * step
+            w = text_width(row, hook_size) + 2 * pad
+            x = cx - w / 2
             lines.append(
-                f"Dialogue: 1,{_ts(0)},{_ts(hook_duration)},Hook,,0,0,0,,"
-                "{\\an5\\pos(" + f"{cx},{y0 + k * step}" + ")\\fad(150,0)}" + row
+                f"Dialogue: 1,{_ts(0)},{_ts(hook_duration)},Box,,0,0,0,,"
+                "{\\an7\\pos(" + f"{x:.0f},{y - box_h / 2:.0f}" + ")" + fade + "\\p1}"
+                + rounded_box(w, box_h, box_h * 0.32) + "{\\p0}"
+            )
+            lines.append(
+                f"Dialogue: 2,{_ts(0)},{_ts(hook_duration)},Hook,,0,0,0,,"
+                "{\\an5\\pos(" + f"{cx},{y + 2}" + ")" + fade + "}" + row
             )
     for g in group_words(words, per_line):
         texts = [_esc(w.text.upper() if uppercase else w.text) for w in g]

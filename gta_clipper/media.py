@@ -111,3 +111,20 @@ def load_words(path: Path) -> list[Word]:
 
 def transcript_text(words: list[Word]) -> str:
     return " ".join(w.text for w in words)
+
+
+def sample_frames(video: Path, out_dir: Path, duration: float, n: int = 6,
+                  width: int = 768) -> list[Path]:
+    """N images réparties dans le clip (JPEG ~770 px), pour que l'IA voie ce qui se passe."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    frames = []
+    for k in range(n):
+        t = duration * (k + 0.5) / n
+        f = out_dir / f"{k}.jpg"
+        r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                            "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
+                            "-vf", f"scale={width}:-2", "-q:v", "5", str(f)],
+                           capture_output=True, timeout=60)
+        if r.returncode == 0 and f.exists():
+            frames.append(f)
+    return frames

@@ -24,11 +24,13 @@ termine par une incitation légère (ex. "Abonne-toi pour plus de clips").
 
 Hashtags : 5 à 8, pertinents, en commençant par ceux du jeu et du streamer.
 
+Comprendre le clip AVANT d'écrire : à partir des images (prises à intervalles réguliers dans le clip), de la transcription et du titre Twitch, identifie LE moment fort et son type : clutch / action incroyable, kill ou mort stupide, découverte (lieu, secret, easter egg, mécanique), fail ou bug, rage, fou rire, peur (jumpscare), réaction à un événement, moment de chat ou d'émotion. Le titre et l'accroche racontent CE moment, pas le stream en général.
+
 Accroche (hook) : le texte incrusté EN HAUT de la vidéo, lu en une seconde.
-- 2 à 7 mots, 42 caractères max, sans emoji, sans hashtag, sans guillemets.
-- Accrocheur et intrigant, comme sur les meilleurs TikTok : "IL TOMBE SUR LE PIRE PNJ", \
-"GOTAGA PERD TOUT EN 10 SECONDES", "SA RÉACTION AU PREMIER BRAQUAGE".
-- Vrai : il décrit ce qui se passe dans la transcription, jamais un événement inventé.
+- 3 à 7 mots, 40 caractères max, sans emoji, sans hashtag, sans guillemets.
+- Elle dit ce qui se passe et donne envie de rester jusqu'à la fin. Formules qui marchent : "IL CLUTCH UN 1V4 IMPOSSIBLE", "IL DÉCOUVRE LE SECRET DU MANOIR", "LA PIRE MORT DE L'HISTOIRE", "IL NE S'ATTENDAIT PAS À ÇA", "SQUEEZIE PÈTE UN CÂBLE", "CE BUG L'A TRAUMATISÉ", "ATTENDS LA FIN…".
+- Concrète plutôt que vague : "IL VOLE UN TANK EN PLEINE VILLE" vaut mieux que "MOMENT INCROYABLE". Un chiffre ou un détail précis (1v4, 10 secondes, 3 étoiles) aide.
+- Vraie : elle décrit ce que montrent les images ou la transcription, jamais un événement inventé. Si tu ne comprends pas ce qui se passe, une accroche de curiosité honnête ("SA RÉACTION VAUT TOUT") plutôt qu'une invention, et confidence à "low".
 
 Corrections : la transcription vient d'une reconnaissance vocale automatique et contient \
 des erreurs (noms de streamers, termes de jeu, mots mal compris). Chaque mot est numéroté \
@@ -57,7 +59,8 @@ class ClipMetadata(BaseModel):
 def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "",
                       model: str = "claude-opus-5-5",
                       base_hashtags: list[str] | None = None,
-                      words: list | None = None, game: str = "") -> ClipMetadata:
+                      words: list | None = None, game: str = "",
+                      frames: list | None = None) -> ClipMetadata:
     from .guard import Guard, LimitReached
     client = anthropic.Anthropic(max_retries=2, timeout=90)
     if words:  # mots numérotés pour que le modèle puisse corriger la transcription
@@ -71,6 +74,15 @@ def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "
         f"Transcription du clip (auto, peut contenir des erreurs) :\n<transcription>\n"
         f"{transcript or '(pas de parole détectée)'}\n</transcription>"
     )
+    content: list | str = user
+    if frames:  # quelques images du clip pour comprendre ce qui se passe à l'écran
+        import base64
+        content = [{"type": "text", "text": f"{len(frames)} images du clip, dans l'ordre :"}]
+        for f in frames:
+            content.append({"type": "image", "source": {
+                "type": "base64", "media_type": "image/jpeg",
+                "data": base64.b64encode(f.read_bytes()).decode()}})
+        content.append({"type": "text", "text": user})
     meta = None
     for m in (model, FALLBACK_MODEL):
         if not Guard.get().allow_llm():
@@ -80,7 +92,7 @@ def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "
             max_tokens=1500,
             system=SYSTEM,
             output_config={"effort": "low"},
-            messages=[{"role": "user", "content": user}],
+            messages=[{"role": "user", "content": content}],
             output_format=ClipMetadata,
         )
         if resp.stop_reason == "refusal":

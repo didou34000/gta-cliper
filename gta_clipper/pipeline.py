@@ -96,7 +96,10 @@ def game_label(cfg: dict) -> str:
 def fallback_hook(streamer: str, twitch_title: str = "", game: str = "") -> str:
     """Accroche sans IA : le titre du clip Twitch s'il est parlant, sinon un titre générique."""
     t = " ".join((twitch_title or "").split())
-    if len(t) >= 8 and not t.isdigit() and len(t) <= 45:
+    # Par défaut, Twitch donne au clip le titre du live (« !drop | Ranked avec la team… ») :
+    # celui-là ne dit rien du moment. On ne garde qu'un titre court écrit par le viewer.
+    generic = any(c in t for c in "|!#@/[]") or "http" in t.lower()
+    if 8 <= len(t) <= 45 and not t.isdigit() and not generic:
         return t
     return f"{streamer} sur {game}" if game else f"Le meilleur moment de {streamer}"
 
@@ -155,11 +158,12 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
         beat("titre", "Pas de clé ANTHROPIC_API_KEY : titre et accroche provisoires")
         skip_llm = True
     if not skip_llm:
-        beat("titre", f"Claude écrit le titre et relit {len(words)} mots de transcription")
+        beat("titre", f"Claude regarde le clip et relit {len(words)} mots de transcription")
         try:
+            frames = media.sample_frames(video, item_dir / "frames", duration, n=6)
             m = generate_metadata(streamer_name, text, twitch_title, cfg["llm"]["model"],
                                   cfg["llm"]["base_hashtags"] if game.startswith("GTA") else [],
-                                  words=words, game=game).model_dump()
+                                  words=words, game=game, frames=frames).model_dump()
             fixes = apply_corrections(words, m.pop("corrections", []))
             if fixes:
                 media.save_words(words, item_dir / "transcript.json")
@@ -179,7 +183,7 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
         color=sc["color"], highlight=sc["highlight_color"], outline=sc["outline"],
         pos_y=sc["position_y"], uppercase=sc["uppercase"],
         hook=meta["hook"] if sc.get("hook", True) else "", hook_y=sc.get("hook_y", 330),
-        hook_size=sc.get("hook_size", 76), hook_duration=duration,
+        hook_size=sc.get("hook_size", 104), hook_duration=duration,
     )
     beat("render", f"Montage vertical {rc['width']}×{rc['height']} (mode {rc['layout']}) "
                    f"+ accroche en haut + sous-titres {sc['words_per_line']} mots par ligne")
