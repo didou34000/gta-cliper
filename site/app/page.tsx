@@ -1,7 +1,7 @@
 import AltTitles from "./AltTitles";
 import CopyPost from "./CopyPost";
 import AutoRefresh from "./AutoRefresh";
-import { loadClips, loadHeartbeat, type Clip, type Status } from "@/lib/data";
+import { loadClips, loadHeartbeat, type Clip, type RunInfo, type Status } from "@/lib/data";
 import { GAMES, REPO, STREAMERS } from "@/lib/launch";
 import { EVERY_OPTIONS, HOURS_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS, loadSchedule } from "@/lib/schedule";
 
@@ -77,6 +77,49 @@ const NODE_LABEL: Record<string, string> = Object.fromEntries(NODES.map((n) => [
 
 function hhmmss(iso: string) {
   return new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris" });
+}
+
+function fmtHoursShort(h?: number) {
+  if (!h) return "";
+  return h >= 48 && h % 24 === 0 ? `${h / 24} j` : `${h} h`;
+}
+
+function runLabel(r: RunInfo) {
+  const d = new Date(r.at);
+  const day = d.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "numeric", month: "short" });
+  const time = d.toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" });
+  return `${day} à ${time}`;
+}
+
+function runParams(r: RunInfo) {
+  return [
+    r.game,
+    r.top ? `top ${r.top} streamers` : "streamers choisis",
+    r.max_clips ? `${r.max_clips} clips max` : "",
+    r.min_views != null ? `≥ ${r.min_views.toLocaleString("fr-FR")} vues` : "",
+    r.hours ? `clips des ${fmtHoursShort(r.hours)}` : "",
+  ].filter(Boolean).join(" · ");
+}
+
+// Clips rangés par passage (le plus récent d'abord), puis par classement dans le passage.
+function groupByRun(clips: Clip[]) {
+  const groups = new Map<string, { run?: RunInfo; clips: Clip[] }>();
+  for (const c of clips) {
+    const key = c.run?.id ?? "avant";
+    const g = groups.get(key) ?? { run: c.run, clips: [] };
+    g.clips.push(c);
+    groups.set(key, g);
+  }
+  const rankKey = (c: Clip) => [-(c.potential ?? 0), c.rank ?? 99, -(c.views ?? 0)];
+  for (const g of groups.values()) {
+    g.clips.sort((a, b) => {
+      const ka = rankKey(a), kb = rankKey(b);
+      for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
+      return 0;
+    });
+  }
+  return [...groups.values()].sort((a, b) =>
+    (b.run ? +new Date(b.run.at) : 0) - (a.run ? +new Date(a.run.at) : 0));
 }
 
 function scoreOf(c: Clip) {
@@ -296,9 +339,18 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
         ) : null}
       </div>
 
-      <section className="clips">
-        {shown.length === 0 && <p className="empty">Aucun clip dans « {TABS.find((t) => t.key === tab)!.label} ».</p>}
-        {shown.map((c) => {
+      {shown.length === 0 && <p className="empty">Aucun clip dans « {TABS.find((t) => t.key === tab)!.label} ».</p>}
+      {groupByRun(shown).map((g) => (
+      <section key={g.run?.id ?? "avant"} className="run-group">
+        <header className="run-head">
+          {g.run
+            ? <><b>Passage du {runLabel(g.run)}</b><span className={`run-trigger run-${g.run.trigger === "programmé" ? "auto" : "manual"}`}>{g.run.trigger}</span>
+                <span className="muted">{runParams(g.run)}</span></>
+            : <b>Passages plus anciens</b>}
+          <span className="run-count">{g.clips.length} clip{g.clips.length > 1 ? "s" : ""}</span>
+        </header>
+      <div className="clips">
+        {g.clips.map((c, i) => {
           const s = scoreOf(c);
           const post = `${c.title}\n\n${c.description}\n\n${c.hashtags.join(" ")}`;
           return (
@@ -310,11 +362,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
                 <input type="hidden" name="id" value={c.id} />
                 <input type="hidden" name="back" value={back} />
                 <div className="meta">
+                  <span className="rankpos">#{i + 1}</span>
                   <span className="streamer">{c.streamer}</span>
+                  {c.potential ? <span className={`potential pot-${c.potential >= 8 ? "hi" : c.potential >= 5 ? "mid" : "lo"}`} title={c.potential_reason || ""}>Potentiel {c.potential}/10</span> : null}
                   <span className="score"><span className="muted">{s.label}</span> {s.value}</span>
                   <span className="muted">{Math.round(c.duration)} s · créé {ago(c.created_at)}</span>
                   {c.source_url && <a href={c.source_url} target="_blank" rel="noreferrer">source Twitch</a>}
                 </div>
+                {c.potential_reason && <p className="muted small">Pourquoi : {c.potential_reason}</p>}
                 {c.confidence === "low" && <p className="warn">Titre peu sûr : vérifie qu'il colle au clip.</p>}
                 <label htmlFor={`t-${c.id}`}>Titre</label>
                 <input id={`t-${c.id}`} name="title" className="title" defaultValue={c.title} />
@@ -358,7 +413,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
             </article>
           );
         })}
+      </div>
       </section>
+      ))}
     </div>
   );
 }

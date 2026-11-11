@@ -197,7 +197,8 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
         "source_id": source_id, "source_url": source_url, "streamer": streamer_name,
         "twitch_title": twitch_title, "duration": round(duration, 2),
         "transcript": text, "status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat(), **(extra or {}),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        **({"run": cfg["_run"]} if cfg.get("_run") else {}), **(extra or {}),
     })
     (item_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),
                                         encoding="utf-8")
@@ -219,6 +220,15 @@ def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[
     what = (f"les {top_n} plus gros streamers FR sur {cfg['game_name'] if cfg.get('game_filter', True) else 'tous les jeux'}"
             if top_n > 0 else f"{len(cfg['streamers'])} streamer(s) à vérifier")
     rep.beat("running", "Démarrage du passage", what, node="twitch")
+    # Fiche du passage, recopiée dans chaque clip : le site range les clips par passage.
+    cfg["_run"] = {
+        "id": os.environ.get("GITHUB_RUN_ID") or datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"),
+        "at": datetime.now(timezone.utc).isoformat(),
+        "trigger": "programmé" if os.environ.get("GITHUB_EVENT_NAME") == "schedule" else "manuel",
+        "game": cfg["game_name"] if cfg.get("game_filter", True) else "tous les jeux",
+        "top": top_n, "max_clips": int(os.environ.get("MAX_CLIPS") or 0) or None,
+        "min_views": cfg.get("min_clip_views"), "hours": cfg.get("lookback_hours"),
+    }
     try:
         out = _run(cfg, skip_llm, chat_dir, rep)
     except Exception as e:
@@ -477,5 +487,5 @@ def _pick_and_make(cfg, skip_llm, rep, work, produced, already, pool):
                        clip.url, work / sid / "source.mp4",
                        max_mb=Guard.get().limits["max_download_mb"]),
                    twitch_title=clip.title, source_url=clip.url, skip_llm=skip_llm,
-                   extra={"views": clip.view_count, "kind": "twitch_clip",
+                   extra={"views": clip.view_count, "kind": "twitch_clip", "rank": n,
                           "potential": c.get("score"), "potential_reason": c.get("raison", "")})

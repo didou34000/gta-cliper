@@ -27,6 +27,21 @@ export type Clip = {
   status: Status;
   post_url?: string;
   decided_at?: string;
+  run?: RunInfo;              // passage qui a produit le clip
+  rank?: number;              // place dans le classement de ce passage
+  potential?: number | null;  // note de potentiel /10 (présélection Claude Haiku)
+  potential_reason?: string;
+};
+
+export type RunInfo = {
+  id: string;
+  at: string;
+  trigger: string;            // « manuel » ou « programmé »
+  game: string;
+  top: number;
+  max_clips?: number | null;
+  min_views?: number;
+  hours?: number;
 };
 
 export type Heartbeat = {
