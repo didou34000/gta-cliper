@@ -79,7 +79,23 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: ffmpeg et police
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core >/dev/null
+        timeout-minutes: 8     # les miroirs apt d'Ubuntu bloquent parfois : on ne reste pas coincé
+        run: |
+          need=""
+          command -v ffmpeg >/dev/null || need="$need ffmpeg"
+          fc-list | grep -qi "DejaVu Sans" || need="$need fonts-dejavu-core"
+          if [ -n "$need" ]; then
+            for i in 1 2 3; do
+              timeout 150 sudo apt-get install -y -qq --no-install-recommends $need >/dev/null && break
+              timeout 120 sudo apt-get update -qq || true
+            done
+          fi
+          if ! command -v ffmpeg >/dev/null; then   # secours : binaire statique
+            curl -fsSL --retry 3 -o /tmp/ff.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+            mkdir -p /tmp/ff && tar -xJf /tmp/ff.tar.xz -C /tmp/ff --strip-components=1
+            sudo cp /tmp/ff/ffmpeg /tmp/ff/ffprobe /usr/local/bin/
+          fi
+          ffmpeg -version | head -1
       - name: Dépendances
         run: pip install -q -r requirements.txt
       - name: Modèle Whisper (cache)
