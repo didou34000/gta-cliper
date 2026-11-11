@@ -27,6 +27,7 @@ class Clip:
     game_id: str
     video_id: str | None
     vod_offset: int | None
+    thumbnail_url: str = ""
 
 
 @dataclass
@@ -197,6 +198,7 @@ class TwitchClient:
                     view_count=c.get("view_count", 0), duration=float(c.get("duration", 0)),
                     created_at=c.get("created_at", ""), game_id=c.get("game_id", ""),
                     video_id=c.get("video_id") or None, vod_offset=c.get("vod_offset"),
+                    thumbnail_url=c.get("thumbnail_url", ""),
                 ))
             cursor = d.get("pagination", {}).get("cursor")
             if not cursor:

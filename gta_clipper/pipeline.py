@@ -351,6 +351,8 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
 def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, produced,
                     hours, min_views):
     from .twitch import fetch_chat_offsets_gql, load_chat_offsets
+    pool: list[dict] = []
+    min_dur = float(cfg.get("min_clip_duration", 20))
     for idx, st in enumerate(cfg["streamers"], 1):
         name = rep.current = st["name"]
         info = rep.streamer(name)
@@ -364,30 +366,29 @@ def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, pr
                       f"config.yaml)", node="twitch", level="error")
             continue
 
-        # 1) Clips viewers les plus vus
+        # 1) Clips viewers les plus vus : on les met de côté, le choix se fait sur l'ensemble
+        #    des streamers (plus bas), pour ne pas remplir le passage avec un seul streamer.
         rep.event(f"Lecture des clips des {hours} dernières heures", node="twitch")
         clips = tw.top_clips(uid, hours, game_id, min_views, cfg["max_clips_per_streamer"])
         cs = getattr(tw, "last_clip_stats", {})
         info["clips_vus"] += cs.get("total", 0)
+        short = [c for c in clips if c.duration < min_dur]
+        clips = [c for c in clips if c.duration >= min_dur]
         info["retenus"] += len(clips)
         rep.stats["clips_trouves"] += len(clips)
         rep.event(
             f"{cs.get('total', 0)} clip(s) trouvés : {cs.get('hors_jeu', 0)} hors jeu, "
             f"{cs.get('sous_seuil', 0)} sous {min_views} vues, {cs.get('doublons', 0)} doublon(s), "
-            f"{cs.get('hors_quota', 0)} hors quota → {len(clips)} retenu(s)"
+            f"{len(short)} trop court(s) (< {min_dur:.0f} s) → {len(clips)} candidat(s)"
             + (f" (le plus vu : {cs['max_vues']} vues)" if cs.get("max_vues") else ""),
             node="scoring")
-        for n, c in enumerate(clips, 1):
+        for c in clips:
             sid = f"clip-{c.id}"
-            label = f"clip {n}/{len(clips)} « {c.title} » ({c.view_count} vues)"
             if sid in already or slug(sid) in already:
                 info["deja_faits"] += 1
-                rep.event(f"Déjà traité, ignoré : {label}", node="scoring")
                 continue
-            _make_clip(cfg, rep, produced, already, sid=sid, name=name, label=label,
-                       video_fn=lambda c=c, sid=sid: media.download(c.url, work / sid / "source.mp4", max_mb=Guard.get().limits["max_download_mb"]),
-                       twitch_title=c.title, source_url=c.url, skip_llm=skip_llm,
-                       extra={"views": c.view_count, "kind": "twitch_clip"})
+            pool.append({"clip": c, "sid": sid, "streamer": name, "views": c.view_count,
+                         "duration": c.duration, "title": c.title, "thumb": c.thumbnail_url})
 
         # 2) Pics de chat dans la dernière VOD (optionnel)
         vc = cfg.get("vod", {})
@@ -423,7 +424,58 @@ def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, pr
                                twitch_title=v.title, source_url=f"{v.url}?t={int(h.start)}s",
                                skip_llm=skip_llm,
                                extra={"kind": "vod_chat_spike", "chat_zscore": h.score})
+        info["etat"] = "en attente"
+
+    _pick_and_make(cfg, skip_llm, rep, work, produced, already, pool)
+    for st in cfg["streamers"]:
+        info = rep.streamer(st["name"])
         info["etat"] = "erreur" if info["erreurs"] and not info["produits"] else "fini"
-        rep.event(f"Terminé : {info['produits']} clip(s) produit(s), {info['deja_faits']} déjà "
-                  f"faits, {info['erreurs']} erreur(s)", node="site", force=True)
     return produced
+
+
+def _pick_and_make(cfg, skip_llm, rep, work, produced, already, pool):
+    """Choisit les meilleurs clips parmi tous les streamers, puis les monte dans cet ordre.
+
+    1. au plus N clips par streamer (les plus vus), pour varier les têtes ;
+    2. les K plus vus de l'ensemble partent en présélection ;
+    3. Claude Haiku note leur potentiel sur miniature + titre (≈ 0,1 centime le passage) ;
+    4. on monte du meilleur au moins bon, jusqu'au plafond du passage.
+    """
+    from .rank import rank_candidates
+    if not pool:
+        rep.event("Aucun nouveau clip candidat (tous déjà traités, trop courts ou sous le seuil)",
+                  node="scoring", force=True)
+        return
+    per = int(cfg.get("max_clips_per_streamer_in_run", 2))
+    k = int(cfg.get("preselect_candidates", 12))
+    pool.sort(key=lambda c: c["views"], reverse=True)
+    count: dict[str, int] = {}
+    cands = []
+    for c in pool:
+        if count.get(c["streamer"], 0) < per:
+            count[c["streamer"]] = count.get(c["streamer"], 0) + 1
+            cands.append(c)
+    cands = cands[:k]
+    game = game_label(cfg)
+    if not skip_llm:
+        rep.event(f"Présélection : Claude Haiku note le potentiel de {len(cands)} clips "
+                  f"({len(count)} streamers)", node="scoring", force=True)
+        cands = rank_candidates(cands, game, cfg.get("llm", {}).get("rank_model", "claude-haiku-5-5"))
+    if any("score" in c for c in cands):
+        rep.event("Classement : " + " · ".join(
+            f"{c['streamer']} {c.get('score', 0)}/10 ({c['views']} vues, {c['duration']:.0f} s"
+            + (f", {c['raison']}" if c.get("raison") else "") + ")" for c in cands[:8]),
+                  node="scoring", force=True)
+    for n, c in enumerate(cands, 1):
+        clip, sid, name = c["clip"], c["sid"], c["streamer"]
+        rep.current = name
+        rep.streamer(name)["etat"] = "en cours"
+        label = (f"clip {n}/{len(cands)} « {clip.title} » ({clip.view_count} vues"
+                 + (f", potentiel {c['score']}/10" if c.get("score") else "") + ")")
+        _make_clip(cfg, rep, produced, already, sid=sid, name=name, label=label,
+                   video_fn=lambda clip=clip, sid=sid: media.download(
+                       clip.url, work / sid / "source.mp4",
+                       max_mb=Guard.get().limits["max_download_mb"]),
+                   twitch_title=clip.title, source_url=clip.url, skip_llm=skip_llm,
+                   extra={"views": clip.view_count, "kind": "twitch_clip",
+                          "potential": c.get("score"), "potential_reason": c.get("raison", "")})

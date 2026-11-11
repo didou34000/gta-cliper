@@ -70,6 +70,14 @@ max_clips_per_streamer: 5
 # Clips Twitch : vues minimum pour être retenu.
 min_clip_views: 200
 
+# Clips plus courts que ça (secondes) ignorés.
+min_clip_duration: 20
+
+# Choix sur l'ensemble des streamers : au plus N clips du même streamer par passage,
+# et les K plus vus partent en présélection (Claude Haiku note leur potentiel).
+max_clips_per_streamer_in_run: 2
+preselect_candidates: 12
+
 # Détection sur VOD par pics de chat (optionnel, plus lourd).
 vod:
   enabled: false
@@ -124,6 +132,7 @@ limits:
 
 llm:
   model: claude-opus-5-5
+  rank_model: claude-haiku-5-5   # présélection bon marché des clips
   base_hashtags: ["#GTA6", "#GTAVI", "#GTA"]
 
 paths:
