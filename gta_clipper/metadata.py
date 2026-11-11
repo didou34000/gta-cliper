@@ -4,7 +4,7 @@ from __future__ import annotations
 import anthropic
 from pydantic import BaseModel, Field
 
-FALLBACK_MODEL = "claude-opus-4-8"
+FALLBACK_MODEL = "claude-sonnet-5-5"  # seulement si le premier modèle refuse
 
 SYSTEM = """Tu écris les métadonnées de clips courts (TikTok, YouTube Shorts, Reels) \
 pour une page de clips de streamers français (jeu indiqué dans le message).
@@ -57,7 +57,7 @@ class ClipMetadata(BaseModel):
 
 
 def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "",
-                      model: str = "claude-opus-5-5",
+                      model: str = "claude-haiku-5-5",
                       base_hashtags: list[str] | None = None,
                       words: list | None = None, game: str = "",
                       frames: list | None = None) -> ClipMetadata:

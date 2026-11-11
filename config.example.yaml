@@ -134,7 +134,7 @@ limits:
   max_download_mb: 400           # taille max d'une vidéo téléchargée
 
 llm:
-  model: claude-opus-5-5
+  model: claude-haiku-5-5        # titres, accroche, description : ~0,1 centime par clip (claude-sonnet-5-5 ≈ 1,5 c, claude-opus-5-5 ≈ 3-4 c)
   rank_model: claude-haiku-5-5   # présélection bon marché des clips
   base_hashtags: ["#GTA6", "#GTAVI", "#GTA"]
 
