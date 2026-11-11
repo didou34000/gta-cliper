@@ -79,6 +79,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
           ))}
         </nav>
         <a href="/frise.html" className="side-help">Comment ça marche</a>
+        <form method="post" action="/api/logout" className="side-logout"><button type="submit">Déconnexion</button></form>
       </aside>
 
       <main className="main">
