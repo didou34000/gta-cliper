@@ -232,6 +232,7 @@ def _make_clip(cfg, rep, produced, already, *, sid, name, video_fn, label, **kw)
             rep.event("Envoi de la vidéo sur le site", node="site")
             try:
                 upload_clip(item)
+                _prune(cfg, rep, keep=item.name)
                 rep.event(f"Clip prêt à valider : {label}", node="site", force=True)
             except Exception as e:
                 rep.stats["erreurs"] += 1
@@ -246,6 +247,18 @@ def _make_clip(cfg, rep, produced, already, *, sid, name, video_fn, label, **kw)
         guard.clip_failed()
         rep.stats["erreurs"] += 1
         rep.event(f"Échec sur {label} : {str(e)[:200]}", level="error")
+
+
+def _prune(cfg: dict, rep, keep: str = "") -> None:
+    """Plafond de clips sur le site (stockage Vercel) : on supprime les plus inutiles."""
+    from .remote import prune_site
+    try:
+        gone = prune_site(int(cfg.get("limits", {}).get("max_clips_on_site", 20)), keep=keep)
+        if gone:
+            rep.event(f"Ménage : {len(gone)} ancien(s) clip(s) supprimé(s) du site "
+                      f"(plafond {cfg.get('limits', {}).get('max_clips_on_site', 20)})", node="site")
+    except Exception as e:
+        log.warning("Ménage du site impossible : %s", e)
 
 
 def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
@@ -287,6 +300,7 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
                   node="twitch", force=True)
     already = seen_ids(cfg)
     from .remote import seen_on_site
+    _prune(cfg, rep)
     on_site = seen_on_site()  # clips déjà envoyés (utile quand le disque est vidé à chaque passage)
     if on_site:
         already |= {sid for sid in on_site}
