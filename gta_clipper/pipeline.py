@@ -173,11 +173,17 @@ def _make_clip(cfg, rep, produced, already, *, sid, name, video_fn, label, **kw)
 def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
     from .twitch import TwitchClient, fetch_chat_offsets_gql, load_chat_offsets
 
+    import os
     tw = TwitchClient()
-    game_id = tw.game_id(cfg["game_name"])
+    if os.environ.get("GAME_FILTER", "on").lower() in ("off", "0", "non", "all"):
+        game_id = None
+        rep.event("Filtre jeu désactivé pour ce passage : tous les jeux sont pris", node="twitch",
+                  level="warn")
+    else:
+        game_id = tw.game_id(cfg["game_name"])
     if game_id:
         rep.event(f"Jeu « {cfg['game_name']} » trouvé sur Twitch (id {game_id})", node="twitch")
-    else:
+    elif os.environ.get("GAME_FILTER", "on").lower() not in ("off", "0", "non", "all"):
         rep.event(f"Jeu « {cfg['game_name']} » introuvable sur Twitch : aucun filtre par jeu",
                   node="twitch", level="warn")
     already = seen_ids(cfg)
@@ -224,7 +230,7 @@ def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, pr
         info["retenus"] += len(clips)
         rep.stats["clips_trouves"] += len(clips)
         rep.event(
-            f"{cs.get('total', 0)} clip(s) trouvés : {cs.get('hors_jeu', 0)} hors GTA VI, "
+            f"{cs.get('total', 0)} clip(s) trouvés : {cs.get('hors_jeu', 0)} hors jeu, "
             f"{cs.get('sous_seuil', 0)} sous {min_views} vues, {cs.get('doublons', 0)} doublon(s), "
             f"{cs.get('hors_quota', 0)} hors quota → {len(clips)} retenu(s)"
             + (f" (le plus vu : {cs['max_vues']} vues)" if cs.get("max_vues") else ""),

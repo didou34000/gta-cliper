@@ -6,7 +6,13 @@ on:
   # retirer les « # » des deux lignes ci-dessous.
   # schedule:
   #   - cron: "7 * * * *"   # toutes les heures (heure UTC, à la minute 7)
-  workflow_dispatch: {}    # bouton « Run workflow » pour lancer à la main
+  workflow_dispatch:       # bouton « Run workflow » pour lancer à la main
+    inputs:
+      filtre_jeu:
+        description: "Garder seulement GTA VI (on) ou tous les jeux (off)"
+        default: "on"
+        type: choice
+        options: ["on", "off"]
 
 concurrency:
   group: bot
@@ -26,6 +32,7 @@ jobs:
       BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
       STOP: ${{ vars.STOP }}               # variable STOP=1 : arrêt d'urgence
       WHISPER_MODEL: ${{ vars.WHISPER_MODEL || 'small' }}
+      GAME_FILTER: ${{ inputs.filtre_jeu || 'on' }}
       WHISPER_DEVICE: cpu
       WHISPER_COMPUTE: int8
     steps:
