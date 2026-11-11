@@ -98,7 +98,7 @@ class TwitchClient:
         (un streamer sans clip exploitable ne sert à rien, même s'il est gros).
         Renvoie [{"login", "name", "why"}], meilleurs d'abord.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
         window = {"started_at": (now - timedelta(hours=hours)).isoformat().replace("+00:00", "Z"),
                   "ended_at": now.isoformat().replace("+00:00", "Z")}
         cand: dict[str, str] = {l.lower(): l for l in (known or [])}
@@ -110,6 +110,19 @@ class TwitchClient:
             cand.setdefault(st["user_login"].lower(), st["user_name"])
             live[st["user_login"].lower()] = st.get("viewer_count", 0)
         if game_id:
+            # Les VOD FR du jeu de la semaine, triées par vues : ceux qui y ont vraiment joué,
+            # même s'ils ne sont pas dans la liste ni en live en ce moment.
+            vp, cursor = {"game_id": game_id, "language": language, "period": "week",
+                          "sort": "views", "type": "archive", "first": 100}, None
+            for _ in range(2):
+                if cursor:
+                    vp["after"] = cursor
+                d = self._get("/videos", vp)
+                for v in d.get("data", []):
+                    cand.setdefault(v["user_login"].lower(), v["user_name"])
+                cursor = d.get("pagination", {}).get("cursor")
+                if not cursor:
+                    break
             cp, cursor = {"game_id": game_id, "first": 100, **window}, None
             for _ in range(3):
                 if cursor:
@@ -121,7 +134,7 @@ class TwitchClient:
                 cursor = d.get("pagination", {}).get("cursor")
                 if not cursor:
                     break
-        logins = list(cand)[:80]
+        logins = list(cand)[:150]
         users: dict[str, dict] = {}
         for i in range(0, len(logins), 100):
             for u in self._get("/users", {"login": logins[i:i + 100]}).get("data", []):
@@ -142,6 +155,7 @@ class TwitchClient:
                        + (f", en live ({_n(live[l])} viewers)" if l in live else "")}
                for total, k, l, name in scored[:n]]
         self.last_top_stats = {"candidats": len(users), "avec_clips": len(scored),
+                               "sources": len(cand),
                                "meilleur": best}
         return out
 
@@ -152,7 +166,7 @@ class TwitchClient:
         Les clips viewers sont le meilleur signal de "moment fort" : quelqu'un a jugé
         que ça valait la peine d'être coupé.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
         params = {
             "broadcaster_id": broadcaster_id,
             "started_at": (now - timedelta(hours=hours)).isoformat().replace("+00:00", "Z"),
