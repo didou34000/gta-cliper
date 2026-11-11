@@ -36,14 +36,16 @@ def seen_ids(cfg: dict) -> set[str]:
 
 def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
                  twitch_title: str = "", source_url: str = "", extra: dict | None = None,
-                 skip_llm: bool = False, words: list | None = None) -> Path:
+                 skip_llm: bool = False, words: list | None = None, beat=None) -> Path:
     """Prend une vidéo horizontale déjà téléchargée et produit un dossier prêt à valider."""
+    beat = beat or (lambda node, msg="": None)
     rc, sc, wc = cfg["render"], cfg["subtitles"], cfg["whisper"]
     item_dir = Path(cfg["paths"]["review"]) / f"{datetime.now():%Y%m%d-%H%M%S}-{slug(source_id)}"
     item_dir.mkdir(parents=True, exist_ok=True)
 
     duration = min(media.probe_duration(video), float(rc.get("max_duration", 60)))
 
+    beat("transcription", streamer_name)
     if words is None:
         log.info("Transcription de %s", video.name)
         words = media.transcribe(video, wc["model"], wc["device"], wc["compute_type"])
@@ -56,6 +58,7 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
         color=sc["color"], highlight=sc["highlight_color"], outline=sc["outline"],
         pos_y=sc["position_y"], uppercase=sc["uppercase"],
     )
+    beat("render", streamer_name)
     out = item_dir / "clip.mp4"
     log.info("Rendu vertical -> %s", out)
     render.render_vertical(video, ass, out, width=rc["width"], height=rc["height"],
@@ -63,6 +66,7 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
     render.extract_thumbnail(out, item_dir / "thumb.jpg", at=min(1.5, duration / 2))
 
     text = media.transcript_text(words)
+    beat("titre", streamer_name)
     if skip_llm:
         meta = {"title": f"{streamer_name} sur GTA 6", "alt_titles": [], "description": "",
                 "hashtags": cfg["llm"]["base_hashtags"], "confidence": "low"}
@@ -85,7 +89,7 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
 def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[Path]:
     from .remote import Reporter
     rep = Reporter()
-    rep.beat("running", "Démarrage du passage")
+    rep.beat("running", "Démarrage du passage", node="twitch")
     try:
         out = _run(cfg, skip_llm, chat_dir, rep)
     except Exception as e:
@@ -107,7 +111,7 @@ def _finish(item: Path, rep, produced: list[Path]) -> None:
     except Exception as e:
         rep.stats["erreurs"] += 1
         log.warning("Clip prêt en local mais pas envoyé sur le site : %s", e)
-    rep.beat("running", "Clip prêt", item.name)
+    rep.beat("running", "Clip prêt", item.name, node="site")
 
 
 def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
@@ -132,17 +136,20 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
                              cfg["max_clips_per_streamer"])
         log.info("%s : %d clip(s) retenu(s)", st["name"], len(clips))
         rep.stats["clips_trouves"] += len(clips)
-        rep.beat("running", f"Clips de {st['name']}", f"{len(clips)} clip(s) au-dessus du seuil")
+        rep.beat("running", f"Clips de {st['name']}", f"{len(clips)} clip(s) au-dessus du seuil",
+                 node="scoring")
         for c in clips:
             sid = f"clip-{c.id}"
             if sid in already:
                 continue
             try:
+                rep.beat("running", f"Téléchargement {st['name']}", node="twitch")
                 video = media.download(c.url, work / sid / "source.mp4")
                 _finish(process_clip(
                     cfg, source_id=sid, streamer_name=st["name"], video=video,
                     twitch_title=c.title, source_url=c.url, skip_llm=skip_llm,
-                    extra={"views": c.view_count, "kind": "twitch_clip"}), rep, produced)
+                    extra={"views": c.view_count, "kind": "twitch_clip"},
+                    beat=lambda n, m="": rep.beat("running", m, node=n)), rep, produced)
                 already.add(sid)
             except Exception:
                 log.exception("Échec sur le clip %s", c.url)
@@ -173,7 +180,8 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
                         cfg, source_id=sid, streamer_name=st["name"], video=video,
                         twitch_title=v.title, source_url=f"{v.url}?t={int(h.start)}s",
                         skip_llm=skip_llm,
-                        extra={"kind": "vod_chat_spike", "chat_zscore": h.score}), rep, produced)
+                        extra={"kind": "vod_chat_spike", "chat_zscore": h.score},
+                        beat=lambda n, m="": rep.beat("running", m, node=n)), rep, produced)
                     already.add(sid)
                 except Exception:
                     log.exception("Échec sur le moment %s", sid)

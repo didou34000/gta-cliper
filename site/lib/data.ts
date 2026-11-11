@@ -33,6 +33,7 @@ export type Heartbeat = {
   ts: string;
   status: "running" | "idle" | "error" | string;
   step?: string;
+  node?: string;
   message?: string;
   stats?: Record<string, number>;
   logs?: string[];

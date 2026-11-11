@@ -11,6 +11,17 @@ const TABS: { key: Status; label: string }[] = [
   { key: "rejected", label: "Rejetés" },
 ];
 
+const NODES: { key: string; label: string; sub: string; stat?: string; tab?: Status }[] = [
+  { key: "twitch", label: "Twitch", sub: "clips + VODs des streamers", stat: "clips_trouves" },
+  { key: "scoring", label: "Scoring", sub: "vues ≥ 200 · pic de chat z ≥ 3" },
+  { key: "transcription", label: "Transcription", sub: "Whisper, mot à mot" },
+  { key: "render", label: "Vertical + sous-titres", sub: "9:16, mot actif en jaune" },
+  { key: "titre", label: "Titre IA", sub: "titre, description, hashtags", stat: "clips_produits" },
+  { key: "site", label: "À valider", sub: "ton OK", tab: "pending" },
+  { key: "approved", label: "À poster", sub: "copier, publier", tab: "approved" },
+  { key: "posted", label: "Publié", sub: "lien du post", tab: "posted" },
+];
+
 const OFFLINE_AFTER_MIN = 75; // le bot tourne toutes les heures
 
 function ago(iso?: string) {
@@ -33,7 +44,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
   const { tab: rawTab } = await searchParams;
   const tab = (TABS.find((t) => t.key === rawTab)?.key ?? "pending") as Status;
   const configured = !!process.env.BLOB_READ_WRITE_TOKEN;
-  const [{ last, history }, clips] = await Promise.all([loadHeartbeat(), loadClips()]);
+  const [{ last }, clips] = await Promise.all([loadHeartbeat(), loadClips()]);
 
   const counts = Object.fromEntries(TABS.map((t) => [t.key, clips.filter((c) => c.status === t.key).length]));
   const shown = clips.filter((c) => c.status === tab);
@@ -59,48 +70,42 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
         <p className="banner">Stockage non configuré : la variable BLOB_READ_WRITE_TOKEN manque sur Vercel.</p>
       )}
 
-      <section className="status">
-        <div className={`bot bot-${state}`}>
-          <div className="bot-head">
-            <span className="dot" aria-hidden="true" />
-            <div>
-              <div className="bot-state">Bot : {stateLabel}</div>
-              <div className="muted">Dernier signal {ago(last?.ts)}</div>
+      <p className={`botline bot-${state}`}>
+        <span className="dot" aria-hidden="true" />
+        <b>Bot : {stateLabel}</b>
+        <span className="muted">· dernier signal {ago(last?.ts)}{last?.step ? ` · ${last.step}` : ""}{last?.message ? ` · ${last.message}` : ""}</span>
+      </p>
+
+      <section className="flow" aria-label="Pipeline">
+        {NODES.map((n, i) => {
+          const active = state === "running" && last?.node === n.key;
+          const count = n.tab ? counts[n.tab] : n.stat ? last?.stats?.[n.stat] : undefined;
+          const inner = (
+            <>
+              <span className="node-title">{n.label}</span>
+              <span className="node-sub">{n.sub}</span>
+              {count !== undefined && <span className="node-count">{count}</span>}
+            </>
+          );
+          return (
+            <div key={n.key} className="flow-item">
+              {n.tab
+                ? <a href={`/?tab=${n.tab}`} className={`node node-tab ${active ? "active" : ""} ${tab === n.tab ? "on" : ""}`}>{inner}</a>
+                : <div className={`node ${active ? "active" : ""}`}>{inner}</div>}
+              {i < NODES.length - 1 && <span className="arrow" aria-hidden="true" />}
             </div>
-          </div>
-          {last?.step && <div className="bot-step"><span className="muted">Étape</span> {last.step}</div>}
-          {last?.message && <div className="bot-msg">{last.message}</div>}
-          {last?.stats && (
-            <dl className="stats">
-              {Object.entries(last.stats).map(([k, v]) => (
-                <div key={k}><dt>{k.replaceAll("_", " ")}</dt><dd>{v}</dd></div>
-              ))}
-            </dl>
-          )}
-          {state === "never" && (
-            <p className="muted small">Lance le bot sur ton PC (<code>python -m gta_clipper run</code>) : il apparaîtra ici dès son premier passage.</p>
-          )}
-        </div>
-        <div className="counters">
-          {TABS.map((t) => (
-            <a key={t.key} href={`/?tab=${t.key}`} className={`counter ${t.key === tab ? "on" : ""}`}>
-              <span className="n">{counts[t.key]}</span><span>{t.label}</span>
-            </a>
-          ))}
-        </div>
+          );
+        })}
       </section>
 
-      {history.length > 1 && (
-        <details className="log">
-          <summary>Activité récente du bot</summary>
-          <ul>
-            {history.map((h) => (
-              <li key={h.ts}><span className="mono muted">{new Date(h.ts).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</span> {h.step ?? h.status}{h.message ? ` · ${h.message}` : ""}</li>
-            ))}
-          </ul>
-          {last?.logs?.length ? <pre>{last.logs.join("\n")}</pre> : null}
-        </details>
-      )}
+      <div className="tabs">
+        {TABS.map((t) => (
+          <a key={t.key} href={`/?tab=${t.key}`} className={t.key === tab ? "on" : ""}>{t.label} ({counts[t.key]})</a>
+        ))}
+        {last?.logs?.length ? (
+          <details className="log"><summary>Logs du bot</summary><pre>{last.logs.join("\n")}</pre></details>
+        ) : null}
+      </div>
 
       <section className="clips">
         {shown.length === 0 && <p className="empty">Aucun clip dans « {TABS.find((t) => t.key === tab)!.label} ».</p>}

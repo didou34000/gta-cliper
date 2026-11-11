@@ -75,11 +75,12 @@ class Reporter:
         self.buffer = LogBuffer()
         logging.getLogger("gta_clipper").addHandler(self.buffer)
 
-    def beat(self, status: str, step: str = "", message: str = "", with_logs: bool = False):
+    def beat(self, status: str, step: str = "", message: str = "", with_logs: bool = False,
+             node: str = ""):
         if not self.on:
             return
         hb = {"ts": datetime.now(timezone.utc).isoformat(), "status": status, "step": step,
-              "message": message, "stats": dict(self.stats)}
+              "message": message, "node": node, "stats": dict(self.stats)}
         if with_logs:
             hb["logs"] = list(self.buffer.lines)
         try:
