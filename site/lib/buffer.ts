@@ -15,7 +15,7 @@ const RETRY_AFTER_MS = 60 * 60_000; // après une erreur, on réessaie au bout d
 
 type Net = "tiktok" | "youtube" | "instagram";
 const CHANNELS: Record<Net, string> = {
-  tiktok: process.env.BUFFER_TIKTOK_CHANNEL_ID || "",
+  tiktok: process.env.BUFFER_TIKTOK_CHANNEL_ID || "6af4a00862b70b94b0f80baa", // @gta6francenews
   youtube: process.env.BUFFER_YOUTUBE_CHANNEL_ID || "6af49c4762b70b94b0f7bdd3", // GTA 6 FRANCE
   instagram: process.env.BUFFER_INSTAGRAM_CHANNEL_ID || "",
 };
