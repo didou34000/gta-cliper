@@ -13,6 +13,9 @@ on:
         default: "on"
         type: choice
         options: ["on", "off"]
+      max_clips:
+        description: "Nombre max de clips pour ce passage"
+        default: "10"
 
 concurrency:
   group: bot
@@ -33,6 +36,7 @@ jobs:
       STOP: ${{ vars.STOP }}               # variable STOP=1 : arrêt d'urgence
       WHISPER_MODEL: ${{ vars.WHISPER_MODEL || 'small' }}
       GAME_FILTER: ${{ inputs.filtre_jeu || 'on' }}
+      MAX_CLIPS: ${{ inputs.max_clips || '10' }}
       WHISPER_DEVICE: cpu
       WHISPER_COMPUTE: int8
     steps:

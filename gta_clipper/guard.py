@@ -30,6 +30,9 @@ class Guard:
 
     def __init__(self, cfg: dict | None = None, path: str | Path = "data/usage.json"):
         self.limits = {**DEFAULTS, **((cfg or {}).get("limits") or {})}
+        if os.environ.get("MAX_CLIPS", "").isdigit():  # réglage ponctuel (passage de test)
+            self.limits["max_new_clips_per_run"] = min(int(os.environ["MAX_CLIPS"]),
+                                                       self.limits["max_new_clips_per_run"])
         self.path = Path(path)
         self.run_clips = 0
         self.consecutive_errors = 0
