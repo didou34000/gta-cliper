@@ -12,6 +12,7 @@ import yaml
 
 from . import media, render, subtitles
 from .highlights import chat_spikes
+from .guard import Guard, LimitReached
 from .metadata import generate_metadata
 
 log = logging.getLogger("gta_clipper")
@@ -69,16 +70,22 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
 
     beat("render", f"Vidéo prête ({out.stat().st_size / 1e6:.1f} Mo, {duration:.0f} s)")
     text = media.transcript_text(words)
-    if skip_llm:
-        meta = {"title": f"{streamer_name} sur GTA 6", "alt_titles": [], "description": "",
-                "hashtags": cfg["llm"]["base_hashtags"], "confidence": "low"}
-    else:
+    meta = {"title": f"{streamer_name} sur GTA 6", "alt_titles": [], "description": "",
+            "hashtags": cfg["llm"]["base_hashtags"], "confidence": "low"}
+    import os
+    if not skip_llm and not os.environ.get("ANTHROPIC_API_KEY"):
+        beat("titre", "Pas de clé ANTHROPIC_API_KEY : titre provisoire à écrire toi-même")
+        skip_llm = True
+    if not skip_llm:
         beat("titre", f"Claude écrit le titre à partir de {len(text.split())} mots de transcription")
-        m = generate_metadata(streamer_name, text, twitch_title, cfg["llm"]["model"],
-                              cfg["llm"]["base_hashtags"])
-        meta = m.model_dump()
-        beat("titre", f"Titre : « {meta['title']} »"
-                      + (" (peu sûr, à vérifier)" if meta.get("confidence") == "low" else ""))
+        try:
+            meta = generate_metadata(streamer_name, text, twitch_title, cfg["llm"]["model"],
+                                     cfg["llm"]["base_hashtags"]).model_dump()
+            beat("titre", f"Titre : « {meta['title']} »"
+                          + (" (peu sûr, à vérifier)" if meta.get("confidence") == "low" else ""))
+        except Exception as e:  # garde-fou ou panne de l'API : le clip n'est pas perdu
+            log.warning("Titre IA impossible : %s", e)
+            beat("titre", f"Titre IA impossible ({str(e)[:120]}) : titre provisoire")
 
     meta.update({
         "source_id": source_id, "source_url": source_url, "streamer": streamer_name,
@@ -93,7 +100,11 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
 
 def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[Path]:
     from .remote import Reporter
+    guard = Guard(cfg, Path(cfg["paths"]["work"]).parent / "usage.json")
     rep = Reporter()
+    if guard.stopped():
+        rep.beat("idle", "Arrêt d'urgence actif", "fichier STOP présent : aucun passage")
+        return []
     for st in cfg["streamers"]:
         rep.streamer(st["name"])
     rep.beat("running", "Démarrage du passage",
@@ -107,12 +118,16 @@ def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[
         raise
     rep.current = ""
     rep.beat("idle", "Passage terminé",
-             f"{rep.stats['clips_produits']} nouveau(x) clip(s) à valider", with_logs=True)
+             f"{rep.stats['clips_produits']} nouveau(x) clip(s) à valider · {guard.summary()}",
+             with_logs=True)
     return out
 
 
 def _make_clip(cfg, rep, produced, already, *, sid, name, video_fn, label, **kw) -> None:
-    """Télécharge, monte, titre et envoie un clip, en racontant chaque étape."""
+    """Télécharge, monte, titre et envoie un clip, en racontant chaque étape.
+    Lève LimitReached si un garde-fou bloque : le passage s'arrête proprement."""
+    guard = Guard.get()
+    guard.check_clip()
     try:
         rep.event(f"Téléchargement de {label}", node="twitch")
         video = video_fn()
@@ -121,6 +136,7 @@ def _make_clip(cfg, rep, produced, already, *, sid, name, video_fn, label, **kw)
                             beat=lambda n, m="": rep.event(m, node=n), **kw)
         produced.append(item)
         already.add(sid)
+        guard.clip_done()
         rep.stats["clips_produits"] += 1
         rep.add(name, "produits")
         from .remote import enabled, upload_clip
@@ -135,8 +151,11 @@ def _make_clip(cfg, rep, produced, already, *, sid, name, video_fn, label, **kw)
                           node="site", level="error")
         else:
             rep.event(f"Clip prêt en local : {item.name}", node="site")
+    except LimitReached:
+        raise
     except Exception as e:
         log.exception("Échec sur %s", sid)
+        guard.clip_failed()
         rep.stats["erreurs"] += 1
         rep.event(f"Échec sur {label} : {str(e)[:200]}", level="error")
 
@@ -156,6 +175,20 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
     produced: list[Path] = []
     hours, min_views = cfg["lookback_hours"], cfg["min_clip_views"]
 
+    try:
+        _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, produced,
+                        hours, min_views)
+    except LimitReached as e:
+        info = rep.streamer(rep.current) if rep.current else None
+        if info:
+            info["etat"] = "arrêté"
+        rep.event(f"Garde-fou : {e}. Reprise au prochain passage.", level="warn", force=True)
+    return produced
+
+
+def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, produced,
+                    hours, min_views):
+    from .twitch import fetch_chat_offsets_gql, load_chat_offsets
     for idx, st in enumerate(cfg["streamers"], 1):
         name = rep.current = st["name"]
         info = rep.streamer(name)
@@ -190,7 +223,7 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
                 rep.event(f"Déjà traité, ignoré : {label}", node="scoring")
                 continue
             _make_clip(cfg, rep, produced, already, sid=sid, name=name, label=label,
-                       video_fn=lambda c=c, sid=sid: media.download(c.url, work / sid / "source.mp4"),
+                       video_fn=lambda c=c, sid=sid: media.download(c.url, work / sid / "source.mp4", max_mb=Guard.get().limits["max_download_mb"]),
                        twitch_title=c.title, source_url=c.url, skip_llm=skip_llm,
                        extra={"views": c.view_count, "kind": "twitch_clip"})
 
@@ -223,7 +256,8 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
                         continue
                     _make_clip(cfg, rep, produced, already, sid=sid, name=name, label=label,
                                video_fn=lambda v=v, h=h, sid=sid: media.download(
-                                   v.url, work / sid / "source.mp4", h.start, h.end),
+                                   v.url, work / sid / "source.mp4", h.start, h.end,
+                                   max_mb=Guard.get().limits["max_download_mb"]),
                                twitch_title=v.title, source_url=f"{v.url}?t={int(h.start)}s",
                                skip_llm=skip_llm,
                                extra={"kind": "vod_chat_spike", "chat_zscore": h.score})

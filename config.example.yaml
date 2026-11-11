@@ -64,6 +64,16 @@ whisper:
   compute_type: auto
 
 # Génération du titre / description / hashtags
+# Garde-fous (le bot s'arrête proprement et reprend au passage suivant).
+# Arrêt d'urgence : crée un fichier STOP dans le dossier du projet.
+limits:
+  max_new_clips_per_run: 10      # clips fabriqués par passage
+  max_new_clips_per_day: 40      # clips fabriqués par jour
+  max_llm_calls_per_day: 60      # appels à Claude par jour (au-delà : titre provisoire)
+  max_site_uploads_per_day: 600  # envois vers le site par jour
+  max_consecutive_errors: 5      # échecs d'affilée avant d'arrêter le passage
+  max_download_mb: 400           # taille max d'une vidéo téléchargée
+
 llm:
   model: claude-opus-5-5
   base_hashtags: ["#GTA6", "#GTAVI", "#GTA"]

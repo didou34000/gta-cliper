@@ -36,7 +36,9 @@ class ClipMetadata(BaseModel):
 def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "",
                       model: str = "claude-opus-5-5",
                       base_hashtags: list[str] | None = None) -> ClipMetadata:
-    client = anthropic.Anthropic()
+    from .guard import Guard, LimitReached
+    client = anthropic.Anthropic(max_retries=2, timeout=90)
+    transcript = (transcript or '')[:4000]  # un clip fait 60 s max : borne de sécurité
     user = (
         f"Streamer : {streamer_name}\n"
         f"Titre donné au clip sur Twitch par un viewer (peut être vide ou approximatif) : "
@@ -46,9 +48,11 @@ def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "
     )
     meta = None
     for m in (model, FALLBACK_MODEL):
+        if not Guard.get().allow_llm():
+            raise LimitReached("Plafond quotidien d'appels à l'IA atteint")
         resp = client.messages.parse(
             model=m,
-            max_tokens=4000,
+            max_tokens=1500,
             system=SYSTEM,
             output_config={"effort": "low"},
             messages=[{"role": "user", "content": user}],

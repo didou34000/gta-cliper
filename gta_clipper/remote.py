@@ -29,7 +29,11 @@ def enabled() -> bool:
     return bool(os.environ.get("BLOB_READ_WRITE_TOKEN"))
 
 
-def put(pathname: str, data: bytes, content_type: str, random_suffix: bool = True) -> dict:
+def put(pathname: str, data: bytes, content_type: str, random_suffix: bool = True,
+        important: bool = True) -> dict:
+    from .guard import Guard
+    if not Guard.get().allow_upload(important):
+        raise RuntimeError("Plafond quotidien d'envois vers le site atteint")
     token = os.environ["BLOB_READ_WRITE_TOKEN"]
     headers = {
         "authorization": f"Bearer {token}",
@@ -144,7 +148,8 @@ class Reporter:
             hb["logs"] = list(self.buffer.lines)
         try:
             put(f"heartbeat/{int(time.time() * 1000)}.json",
-                json.dumps(hb, ensure_ascii=False).encode(), "application/json")
+                json.dumps(hb, ensure_ascii=False).encode(), "application/json",
+                important=force)
             self._last_push, self._dirty = time.time(), False
         except Exception as e:  # le site ne doit jamais bloquer le bot
             log.warning("Statut non envoyé au site : %s", e)

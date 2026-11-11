@@ -7,7 +7,8 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 
 
-def download(url: str, out: Path, start: float | None = None, end: float | None = None) -> Path:
+def download(url: str, out: Path, start: float | None = None, end: float | None = None,
+             max_mb: int = 400) -> Path:
     """Télécharge un clip Twitch, ou une section d'une VOD si start/end sont donnés."""
     import yt_dlp
     from yt_dlp.utils import download_range_func
@@ -19,6 +20,7 @@ def download(url: str, out: Path, start: float | None = None, end: float | None 
         "merge_output_format": "mp4",
         "quiet": True,
         "noprogress": True,
+        "max_filesize": max_mb * 1024 * 1024,  # garde-fou taille
     }
     if start is not None and end is not None:
         opts["download_ranges"] = download_range_func(None, [(start, end)])
@@ -28,6 +30,8 @@ def download(url: str, out: Path, start: float | None = None, end: float | None 
         path = Path(ydl.prepare_filename(info))
     if path.suffix != ".mp4" and path.with_suffix(".mp4").exists():
         path = path.with_suffix(".mp4")
+    if not path.exists():
+        raise RuntimeError(f"Téléchargement refusé ou vide (taille max {max_mb} Mo)")
     return path
 
 

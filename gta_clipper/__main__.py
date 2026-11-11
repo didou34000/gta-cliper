@@ -63,7 +63,12 @@ def main() -> None:
         print(f"{len(out)} clip(s) en attente de validation. Lance : python -m gta_clipper review")
     elif a.cmd == "loop":
         import time
+        from .guard import Guard
         while True:
+            if Guard.stopped():
+                print("Fichier STOP présent : pas de passage. Supprime-le pour relancer.")
+                time.sleep(60)
+                continue
             try:
                 out = run(cfg, skip_llm=a.no_llm, chat_dir=a.chat_dir)
                 print(f"{len(out)} nouveau(x) clip(s). Prochain passage dans {a.every} min.")

@@ -4,3 +4,4 @@ config.yaml
 __pycache__/
 *.pyc
 test/sample.mp4
+*.tsbuildinfo
