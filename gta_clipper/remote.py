@@ -255,7 +255,8 @@ class Reporter:
             # On n'insiste pas à chaque ligne : prochain essai dans MIN_INTERVAL secondes,
             # et plus du tout si le stockage est bloqué (quota dépassé, store suspendu).
             self._last_push = time.time()
-            if any(w in str(e) for w in ("AccessDenied", "403", "InvalidAccessKeyId", "NoSuchBucket")):
+            if any(w in str(e) for w in ("AccessDenied", "403", "InvalidAccessKeyId", "NoSuchBucket",
+                                         "Plafond R2")):
                 self.on = False
                 log.error("Stockage du site bloqué (%s) : le bot continue mais le site ne sera "
                           "plus mis à jour pendant ce passage.", e)

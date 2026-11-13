@@ -232,6 +232,7 @@ def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[
         "top": top_n, "max_clips": int(os.environ.get("MAX_CLIPS") or 0) or None,
         "min_views": cfg.get("min_clip_views"), "hours": cfg.get("lookback_hours"),
     }
+    _budget_stop(rep)
     try:
         out = _run(cfg, skip_llm, chat_dir, rep)
     except Exception as e:
@@ -244,6 +245,20 @@ def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[
              f"{rep.stats['clips_produits']} nouveau(x) clip(s) à valider · {guard.summary()}",
              with_logs=True)
     return out
+
+
+def _budget_stop(rep) -> None:
+    """Plafond dur du stockage gratuit : si le mois a déjà consommé la moitié du quota R2,
+    on ne lance même pas le passage (le passage GitHub échoue avec la raison en clair)."""
+    from .remote import enabled
+    from .usage import BudgetExceeded, check_budget
+    if not enabled():
+        return
+    try:
+        check_budget("A")
+    except BudgetExceeded as e:
+        rep.on = False
+        raise SystemExit(str(e)) from e
 
 
 _AUTO_MIN: int | None = None
@@ -551,6 +566,7 @@ def run_youtube(cfg: dict, url: str, n: int = 3, streamer: str = "",
     guard = Guard(cfg, Path(cfg["paths"]["work"]).parent / "usage.json")
     rep = Reporter()
     rep.kind = "youtube"
+    _budget_stop(rep)
     if guard.stopped():
         rep.beat("idle", "Arrêt d'urgence actif", "aucun passage")
         return []

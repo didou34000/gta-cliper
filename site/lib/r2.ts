@@ -36,10 +36,45 @@ const ops = { a: 0, b: 0, pages: 0, since: Date.now() };
 export const countOp = (cls: "A" | "B") => { if (cls === "A") ops.a++; else ops.b++; };
 export const countPage = () => { ops.pages++; };
 
+// --- Plafond dur : jamais au-delà du quota gratuit ---------------------------------------------
+// Le site refuse toute opération dès que le mois (bot + site) atteint la moitié du quota gratuit
+// (réglable avec R2_MAX_A / R2_MAX_B). Total du mois : usage/total-AAAA-MM.json, relu toutes les 10 min.
+export const FREE_A = 1_000_000, FREE_B = 10_000_000;
+export const MAX_A = Number(env("R2_MAX_A")) || FREE_A / 2;
+export const MAX_B = Number(env("R2_MAX_B")) || FREE_B / 2;
+const totalKey = () => `usage/total-${new Date().toISOString().slice(0, 7)}.json`;
+let monthTotal: { a: number; b: number; loadedAt: number; key: string } | null = null;
+let loadingTotal = false;
+
+async function ensureTotal() {
+  if (loadingTotal) return;
+  if (monthTotal && monthTotal.key === totalKey() && Date.now() - monthTotal.loadedAt < 10 * 60_000) return;
+  loadingTotal = true;
+  try {
+    const t = await getJsonKey<{ a?: number; b?: number }>(totalKey());
+    monthTotal = { a: t?.a ?? 0, b: t?.b ?? 0, loadedAt: Date.now(), key: totalKey() };
+  } finally {
+    loadingTotal = false;
+  }
+}
+
+export class BudgetError extends Error {}
+export function budget() {
+  const a = (monthTotal?.a ?? 0) + ops.a, b = (monthTotal?.b ?? 0) + ops.b;
+  return { a, b, maxA: MAX_A, maxB: MAX_B, blocked: a >= MAX_A || b >= MAX_B };
+}
+
 async function call(method: string, key: string, init: { query?: Record<string, string>; body?: BodyInit; headers?: Record<string, string> } = {}) {
+  const cls = method === "DELETE" ? null : method === "GET" && !init.query?.["list-type"] ? "B" : "A";
+  if (cls && !loadingTotal) {
+    await ensureTotal();
+    const b = budget();
+    if (cls === "A" && b.a >= MAX_A) throw new BudgetError(`Plafond R2 atteint : ${b.a} opérations A ce mois-ci (limite ${MAX_A} sur ${FREE_A} gratuites). Plus aucune écriture jusqu'au 1er du mois.`);
+    if (cls === "B" && b.b >= MAX_B) throw new BudgetError(`Plafond R2 atteint : ${b.b} opérations B ce mois-ci (limite ${MAX_B} sur ${FREE_B} gratuites).`);
+  }
   const qs = init.query ? "?" + new URLSearchParams(init.query).toString() : "";
   const url = `${endpoint()}/${bucket()}${key ? "/" + encKey(key) : ""}${qs}`;
-  if (method !== "DELETE") countOp(method === "GET" && !init.query?.["list-type"] ? "B" : "A");
+  if (cls) countOp(cls);
   return aws().fetch(url, { method, body: init.body, headers: init.headers, cache: "no-store" } as RequestInit);
 }
 
@@ -129,12 +164,18 @@ export async function flushSiteOps(force = false) {
   lastFlush = Date.now();
   const day = new Date().toISOString().slice(0, 10);
   const key = `usage/site-${day}.json`;
-  const take = { a: ops.a + 2, b: ops.b, pages: ops.pages };
+  // Les lectures/écritures du relevé lui-même sont comptées dans ops et partiront au prochain envoi.
+  const take = { a: ops.a, b: ops.b, pages: ops.pages };
   ops.a = 0; ops.b = 0; ops.pages = 0;
   try {
     const cur = (await getJsonKey<{ a: number; b: number; pages: number }>(key)) ?? { a: 0, b: 0, pages: 0 };
     await putObject(key, JSON.stringify({ a: cur.a + take.a, b: cur.b + take.b, pages: cur.pages + take.pages, at: new Date().toISOString() }));
+    // Total du mois (bot + site) qui sert au plafond.
+    const tot = (await getJsonKey<{ a?: number; b?: number }>(totalKey())) ?? {};
+    const next = { a: (tot.a ?? 0) + take.a, b: (tot.b ?? 0) + take.b, at: new Date().toISOString() };
+    await putObject(totalKey(), JSON.stringify(next));
+    monthTotal = { a: next.a, b: next.b, loadedAt: Date.now(), key: totalKey() };
   } catch {
-    ops.a += take.a - 2; ops.b += take.b; ops.pages += take.pages; // on réessaiera plus tard
+    ops.a += take.a; ops.b += take.b; ops.pages += take.pages; // on réessaiera plus tard
   }
 }

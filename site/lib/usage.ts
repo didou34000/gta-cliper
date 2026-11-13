@@ -7,7 +7,7 @@
 //  - les minutes GitHub Actions du mois (API GitHub) ;
 //  - si CF_API_TOKEN est défini : le total exact compté par Cloudflare (API Analytics).
 // Ce qui est ESTIMÉ : la projection de fin de mois et l'usage Vercel (pas d'API gratuite).
-import { getJsonKey, listAll, r2Configured } from "./r2";
+import { FREE_A, FREE_B, MAX_A, MAX_B, getJsonKey, listAll, r2Configured } from "./r2";
 import { gh } from "./github";
 
 export type RunUsage = {
@@ -28,6 +28,7 @@ export type Usage = {
   github: { minutes: number; runs: number } | null;
   perClip: { a: number; b: number; usd: number; minutes: number } | null;
   perRun: { a: number; b: number; usd: number; minutes: number } | null;
+  cap: { a: number; b: number; maxA: number; maxB: number; freeA: number; freeB: number };
 };
 
 export const PLANS = {
@@ -94,14 +95,15 @@ export async function loadUsage(): Promise<Usage> {
   const daysInMonth = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 0).getDate();
   const empty = { a: 0, b: 0, pages: 0, days: 0 };
 
-  const [book, siteDays, cf, ghm] = await Promise.all([
+  const [book, siteDays, cf, ghm, total] = await Promise.all([
     r2Configured() ? getJsonKey<{ runs: RunUsage[] }>(`usage/${month}.json`) : null,
     r2Configured()
       ? listAll(`usage/site-${month}`, 60_000).then((objs) =>
-          Promise.all(objs.map((o) => getJsonKey<{ a: number; b: number; pages: number }>(o.pathname))))
+          Promise.all(objs.map((o) => getJsonKey<{ a: number; b: number; pages: number }>(o.pathname))), () => [])
       : Promise.resolve([]),
     cloudflareTotals(month).then((v) => ({ v, e: undefined as string | undefined }), (e: Error) => ({ v: null, e: e.message })),
     githubMinutes(month),
+    r2Configured() ? getJsonKey<{ a?: number; b?: number }>(`usage/total-${month}.json`) : null,
   ]);
 
   const runs = (book?.runs ?? []).filter((r) => r.at?.startsWith(month));
@@ -128,5 +130,6 @@ export async function loadUsage(): Promise<Usage> {
     month, dayOfMonth: now.getUTCDate(), daysInMonth, runs: runs.slice(-50).reverse(), bot, site,
     cloudflare: cf.v, cloudflareError: process.env.CF_API_TOKEN ? cf.e : undefined,
     github: ghm, perClip, perRun,
+    cap: { a: total?.a ?? 0, b: total?.b ?? 0, maxA: MAX_A, maxB: MAX_B, freeA: FREE_A, freeB: FREE_B },
   };
 }
