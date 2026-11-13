@@ -79,13 +79,15 @@ def request(method: str, key: str = "", query: dict | None = None, body: bytes =
     # Classes de facturation R2 : A = écriture/listage, B = lecture, DELETE = gratuit.
     op_class = ("" if method == "DELETE" else
                 "B" if method in ("GET", "HEAD") and "list-type" not in (query or {}) else "A")
+    try:
+        from . import usage
+    except ImportError:
+        usage = None
+    if usage and op_class:
+        usage.check_budget(op_class)  # plafond dur : jamais au-delà du quota gratuit
     for attempt in range(4):
-        try:
-            from . import usage
-            if op_class:
-                usage.r2(op_class)  # chaque tentative compte chez Cloudflare
-        except ImportError:
-            pass
+        if usage and op_class:
+            usage.r2(op_class)  # chaque tentative compte chez Cloudflare
         req = urllib.request.Request(url, data=body if method in ("PUT", "POST") else None,
                                      method=method, headers={k: v for k, v in h.items() if k != "host"})
         try:

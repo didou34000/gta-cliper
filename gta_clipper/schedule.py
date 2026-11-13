@@ -63,10 +63,14 @@ def main() -> int:
         print("Clés R2 manquantes (R2_ACCOUNT_ID…) : programmation impossible")
         run, why, cfg = False, "pas de stockage", None
     else:
-        cfg = latest_config()
-        run, why = decide(cfg, last_run(), now)
-        if run:
-            mark_run(now)
+        try:
+            cfg = latest_config()
+            run, why = decide(cfg, last_run(), now)
+            if run:
+                mark_run(now)
+        except Exception as e:  # dont le plafond du quota gratuit R2
+            print(f"::warning::{e}")
+            run, why, cfg = False, f"pas de passage : {e}", None
     print(why)
     values = {"run": "true" if run else "false"}
     if run and cfg:

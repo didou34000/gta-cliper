@@ -2,7 +2,7 @@ import LiveBar from "./LiveBar";
 import { latestRun } from "@/lib/github";
 import { loadClipsAndSize, loadHeartbeat } from "@/lib/data";
 import { loadSchedule } from "@/lib/schedule";
-import { countPage, flushSiteOps, r2Configured } from "@/lib/r2";
+import { budget, countPage, flushSiteOps, r2Configured } from "@/lib/r2";
 import { loadUsage } from "@/lib/usage";
 import { loadStats } from "@/lib/stats";
 import { botState, type Ctx } from "./ctx";
@@ -91,6 +91,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
 
       <main className="main">
         <LiveBar key={sent ?? 0} initial={{ run, beat: last, now: new Date().toISOString() }} sent={sent} full={view === "bot"} />
+        {ctx.configured && budget().blocked && <p className="banner">Plafond de sécurité atteint : la moitié du quota gratuit Cloudflare R2 est consommée ce mois-ci, le bot ne se lance plus et le site n&apos;écrit plus rien jusqu&apos;au 1er du mois. Rien ne sera facturé.</p>}
         {!ctx.configured && <p className="banner">Stockage non configuré : les clés R2 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL) manquent sur Vercel.</p>}
         {view === "accueil" && <Overview ctx={ctx} />}
         {view === "valider" && <ClipsView ctx={ctx} status="pending" />}

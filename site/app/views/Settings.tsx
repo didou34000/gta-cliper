@@ -54,6 +54,14 @@ export default function SettingsView({ ctx, usage }: { ctx: Ctx; usage: Usage })
     <>
       <PageHead title="Consommation & quotas" sub={`Mois en cours (${u.month}), jour ${u.dayOfMonth} sur ${u.daysInMonth}. Chaque chiffre dit s'il est mesuré ou estimé.`} />
 
+      <Panel title="Plafond de sécurité" sub="Jamais au-delà du gratuit : tout s'arrête à la moitié du quota">
+        <div className="meters">
+          <Meter label={<>Écritures et listages R2 · {nf(u.cap.a)} sur {nf(u.cap.maxA)} autorisées ({nf(u.cap.freeA)} gratuites) <Src kind="mesuré" /></>} value={u.cap.a} max={u.cap.maxA} />
+          <Meter label={<>Lectures R2 · {nf(u.cap.b)} sur {nf(u.cap.maxB)} autorisées ({nf(u.cap.freeB)} gratuites) <Src kind="mesuré" /></>} value={u.cap.b} max={u.cap.maxB} tone="violet" />
+        </div>
+        <p className="muted small">À 100 % de cette jauge, le bot ne se lance plus et le site n&apos;écrit plus rien jusqu&apos;au 1er du mois : on reste toujours à moins de la moitié du gratuit. Stockage : ménage automatique à 800 Mo, loin des 10 Go gratuits. Cloudflare ne propose pas de plafond de dépenses sur R2, ce garde-fou est dans notre code.</p>
+      </Panel>
+
       <Panel title="Par clip et par passage" sub="Moyennes mesurées sur les passages de ce mois">
         {u.perClip || u.perRun ? (
           <ul className="facts facts-cols">

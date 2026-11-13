@@ -2,7 +2,7 @@
 //  clips/<id>/meta-*.json, clip-*.mp4, thumb-*.jpg : écrits une fois par le bot
 //  decisions/<id>/<ms>-*.json : chaque action faite sur le site (jamais écrasé)
 //  status/live.json         : statut du bot (un seul fichier réécrit, lu sans listage)
-import { deleteObjects, getJsonKey, listAll, publicUrl, putObject, r2Configured } from "./r2";
+import { BudgetError, deleteObjects, getJsonKey, listAll, publicUrl, putObject, r2Configured, type Obj } from "./r2";
 import { DEMO_BEAT, DEMO_CLIPS, demoOn } from "./demo";
 
 export type Status = "pending" | "approved" | "rejected" | "posted";
@@ -107,7 +107,13 @@ export async function loadClips(): Promise<Clip[]> {
 export async function loadClipsAndSize(): Promise<{ clips: Clip[]; bytes: number }> {
   if (demoOn()) return { clips: DEMO_CLIPS, bytes: 210e6 };
   if (!hasStore()) return { clips: [], bytes: 0 };
-  const [clipBlobs, decisionBlobs] = await Promise.all([listAll("clips/"), listAll("decisions/")]);
+  let clipBlobs: Obj[], decisionBlobs: Obj[];
+  try {
+    [clipBlobs, decisionBlobs] = await Promise.all([listAll("clips/"), listAll("decisions/")]);
+  } catch (e) {
+    if (e instanceof BudgetError) return { clips: [], bytes: 0 }; // plafond atteint : le bandeau l'explique
+    throw e;
+  }
   const bytes = clipBlobs.reduce((n, b) => n + (b.size ?? 0), 0);
 
   const byId = new Map<string, { meta?: string; video?: string; thumb?: string }>();
