@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -23,16 +24,29 @@ class R2Error(RuntimeError):
     pass
 
 
+def _env(k: str) -> str:
+    """Valeur nettoyée : espaces et retours à la ligne collés par erreur retirés."""
+    return (os.environ.get(k) or "").strip()
+
+
+def account_id() -> str:
+    """Accepte l'Account ID seul, ou collé avec l'adresse S3 complète
+    (https://<id>.r2.cloudflarestorage.com/...) : on garde les 32 caractères de l'identifiant."""
+    raw = _env("R2_ACCOUNT_ID")
+    m = re.search(r"[0-9a-f]{32}", raw.lower())
+    return m.group(0) if m else raw
+
+
 def configured() -> bool:
-    return all(os.environ.get(k) for k in VARS)
+    return all(_env(k) for k in VARS)
 
 
 def bucket() -> str:
-    return os.environ.get("R2_BUCKET") or "gta-clipper"
+    return _env("R2_BUCKET") or "gta-clipper"
 
 
 def public_url(key: str = "") -> str:
-    base = os.environ["R2_PUBLIC_URL"].rstrip("/")
+    base = _env("R2_PUBLIC_URL").rstrip("/")
     return f"{base}/{key}" if key else base
 
 
@@ -42,7 +56,7 @@ def _endpoint() -> tuple[str, str]:
     if ep:
         u = urllib.parse.urlparse(ep)
         return u.scheme, u.netloc
-    return "https", f"{os.environ['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com"
+    return "https", f"{account_id()}.r2.cloudflarestorage.com"
 
 
 def _sign(key: bytes, msg: str) -> bytes:
@@ -68,11 +82,11 @@ def request(method: str, key: str = "", query: dict | None = None, body: bytes =
     scope = f"{day}/auto/s3/aws4_request"
     to_sign = "\n".join(["AWS4-HMAC-SHA256", amz_date, scope,
                          hashlib.sha256(canonical.encode()).hexdigest()])
-    k = _sign(("AWS4" + os.environ["R2_SECRET_ACCESS_KEY"]).encode(), day)
+    k = _sign(("AWS4" + _env("R2_SECRET_ACCESS_KEY")).encode(), day)
     for part in ("auto", "s3", "aws4_request"):
         k = _sign(k, part)
     sig = hmac.new(k, to_sign.encode(), hashlib.sha256).hexdigest()
-    h["authorization"] = (f"AWS4-HMAC-SHA256 Credential={os.environ['R2_ACCESS_KEY_ID']}/{scope}, "
+    h["authorization"] = (f"AWS4-HMAC-SHA256 Credential={_env('R2_ACCESS_KEY_ID')}/{scope}, "
                           f"SignedHeaders={signed}, Signature={sig}")
     url = f"{scheme}://{host}{path}" + (f"?{qs}" if qs else "")
     last = ""

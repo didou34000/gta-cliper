@@ -11,7 +11,9 @@ import { AwsClient } from "aws4fetch";
 
 export type Obj = { pathname: string; url: string; size: number; uploadedAt: string };
 
-const env = (k: string) => process.env[k] ?? "";
+const env = (k: string) => (process.env[k] ?? "").trim();
+// Accepte l'Account ID seul ou collé avec l'adresse S3 complète : on garde les 32 caractères.
+const accountId = () => env("R2_ACCOUNT_ID").toLowerCase().match(/[0-9a-f]{32}/)?.[0] ?? env("R2_ACCOUNT_ID");
 export const r2Configured = () =>
   !!(env("R2_ACCOUNT_ID") && env("R2_ACCESS_KEY_ID") && env("R2_SECRET_ACCESS_KEY") && env("R2_PUBLIC_URL"));
 const bucket = () => env("R2_BUCKET") || "gta-clipper";
@@ -19,7 +21,7 @@ export const publicUrl = (key = "") => {
   const base = env("R2_PUBLIC_URL").replace(/\/+$/, "");
   return key ? `${base}/${key}` : base;
 };
-const endpoint = () => env("R2_ENDPOINT") || `https://${env("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com`;
+const endpoint = () => env("R2_ENDPOINT") || `https://${accountId()}.r2.cloudflarestorage.com`;
 const encKey = (key: string) => key.split("/").map(encodeURIComponent).join("/");
 
 let client: AwsClient | null = null;
