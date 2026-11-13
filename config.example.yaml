@@ -138,7 +138,14 @@ limits:
 llm:
   model: claude-haiku-5-5        # titres, accroche, description : ~0,1 centime par clip (claude-sonnet-5-5 ≈ 1,5 c, claude-opus-5-5 ≈ 3-4 c)
   rank_model: claude-haiku-5-5   # présélection bon marché des clips
+  moments_model: claude-haiku-5-5  # lien YouTube : choix des moments (< 1 centime par heure de vidéo ; claude-sonnet-5-5 ≈ 8 c/h, meilleur choix)
   base_hashtags: ["#GTA6", "#GTAVI", "#GTA"]
+
+# Lien YouTube (façon Opus Clip) : python -m gta_clipper youtube <lien>, ou le site.
+youtube:
+  max_clips: 8            # clips max par vidéo
+  max_minutes: 180        # au-delà, seules les 180 premières minutes sont analysées
+  analysis_model: small   # Whisper rapide pour lire toute la vidéo (les clips gardent le modèle précis)
 
 paths:
   work: data/work

@@ -7,17 +7,18 @@ on:
 jobs:
   t:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix: { essai: [1, 2, 3] }
     steps:
       - uses: denoland/setup-deno@v2
         with: { deno-version: v2.x }
+      - uses: FedericoCarboni/setup-ffmpeg@v3
       - run: pip install -q -U "yt-dlp[default]"
-      - name: Test 1 (clients par defaut)
+      - name: Son seul (video GTA longue)
         continue-on-error: true
-        run: yt-dlp -f "bv*[height<=720]+ba/b" -o t1.mp4 "https://www.youtube.com/watch?v=jNQXAC9IVRw" 2>&1 | tail -6; ls -la t1* || true
-      - name: Test 2 (video longue, 30 s seulement)
+        run: yt-dlp -f "ba/b" -o a.%(ext)s "https://www.youtube.com/watch?v=QdBZY2fkU-0" 2>&1 | tail -4; ls -la a.* || true
+      - name: Section video 30 s
         continue-on-error: true
-        run: yt-dlp -f "bv*[height<=720]+ba/b" --download-sections "*60-90" -o t2.mp4 "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | tail -6; ls -la t2* || true
-      - name: Test 3 (client tv)
-        continue-on-error: true
-        run: yt-dlp --extractor-args "youtube:player_client=tv,web_safari" -f "b[height<=720]/b" -o t3.mp4 "https://www.youtube.com/watch?v=jNQXAC9IVRw" 2>&1 | tail -6; ls -la t3* || true
+        run: yt-dlp -f "bv*[height<=1080]+ba/b" --download-sections "*60-90" -o t2.mp4 "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | tail -4; ls -la t2* || true
