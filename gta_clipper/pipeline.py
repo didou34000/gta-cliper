@@ -126,6 +126,41 @@ def apply_corrections(words: list, corrections: list[dict]) -> list[dict]:
     return done
 
 
+def trim_window(start: float, end: float, duration: float, words: list,
+                min_len: float = 15.0) -> tuple[float, float] | None:
+    """Fenêtre de découpe proposée par l'IA, vérifiée et calée sur les mots.
+
+    Renvoie None si elle est absurde ou ne change presque rien (le clip reste entier).
+    Le début recule au début du mot en cours (jamais au milieu d'un mot ou d'une phrase
+    commencée juste avant), avec 0,3 s de marge ; la fin avance à la fin du mot en cours,
+    avec 0,5 s de marge pour laisser la réaction respirer."""
+    try:
+        start, end = float(start), float(end)
+    except (TypeError, ValueError):
+        return None
+    start, end = max(0.0, start), min(duration, end)
+    if end - start < min_len:
+        return None
+    for w in words:  # mot coupé par le début : on le reprend en entier
+        if w.start < start < w.end:
+            start = w.start
+            break
+    # Phrase déjà lancée au début : on recule jusqu'à la pause qui la précède (3 s max).
+    prev = [w for w in words if w.end <= start + 1e-6]
+    limit = start - 3.0
+    while prev and start - prev[-1].end < 0.3 and prev[-1].start >= limit:
+        start = prev.pop().start
+    start = max(0.0, start - 0.3)
+    for w in words:
+        if w.start < end < w.end:
+            end = w.end
+            break
+    end = min(duration, end + 0.5)
+    if start < 1.0 and duration - end < 2.0:
+        return None  # déjà bien coupé
+    return start, end
+
+
 def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
                  twitch_title: str = "", source_url: str = "", extra: dict | None = None,
                  skip_llm: bool = False, words: list | None = None, beat=None) -> Path:
@@ -161,15 +196,26 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
     if not skip_llm:
         beat("titre", f"Claude regarde le clip et relit {len(words)} mots de transcription")
         try:
-            frames = media.sample_frames(video, item_dir / "frames", duration, n=6)
+            n_frames = 10 if duration > 30 else 6
+            frames = media.sample_frames(video, item_dir / "frames", duration, n=n_frames)
+            times = [duration * (int(f.stem) + 0.5) / n_frames for f in frames]
             m = generate_metadata(streamer_name, text, twitch_title, cfg["llm"]["model"],
                                   cfg["llm"]["base_hashtags"] if game.startswith("GTA") else [],
-                                  words=words, game=game, frames=frames).model_dump()
+                                  words=words, game=game, frames=frames, frame_times=times,
+                                  duration=duration).model_dump()
+            cut = trim_window(m.pop("start_s", 0.0), m.pop("end_s", duration), duration, words,
+                              min_len=float(rc.get("min_trim", 15)))
             fixes = apply_corrections(words, m.pop("corrections", []))
             if fixes:
                 media.save_words(words, item_dir / "transcript.json")
                 text = media.transcript_text(words)
             meta = {**m, "hook": m.get("hook") or meta["hook"], "corrections": fixes}
+            if cut:
+                start, end = cut
+                beat("titre", f"Recoupé autour du moment fort : {start:.0f} s → {end:.0f} s "
+                              f"(au lieu de 0 → {duration:.0f} s)")
+                meta["trim"] = {"start": round(start, 2), "end": round(end, 2),
+                                "original": round(duration, 2)}
             beat("titre", f"Titre : « {meta['title']} » · accroche : « {meta['hook']} »"
                           + (f" · {len(fixes)} mot(s) corrigé(s)" if fixes else "")
                           + (" (peu sûr, à vérifier)" if meta.get("confidence") == "low" else ""))
@@ -178,6 +224,12 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
             beat("titre", f"Titre IA impossible ({str(e)[:120]}) : titre provisoire")
 
     # 2) Montage vertical avec accroche en haut et sous-titres animés.
+    start = 0.0
+    if meta.get("trim"):
+        start, end = meta["trim"]["start"], meta["trim"]["end"]
+        words = [w for w in words if w.end > start and w.start < end]
+        duration = end - start
+        text = media.transcript_text(words)
     ass = subtitles.build_ass(
         words, item_dir / "subs.ass", width=rc["width"], height=rc["height"],
         font=sc["font"], font_size=sc["font_size"], per_line=sc["words_per_line"],
@@ -186,13 +238,14 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
         hook_fg=sc.get("hook_fg", "&H00FFFFFF"),
         pos_y=sc["position_y"], uppercase=sc["uppercase"],
         hook=meta["hook"] if sc.get("hook", True) else "", hook_y=sc.get("hook_y", 330),
-        hook_size=sc.get("hook_size", 104), hook_duration=duration,
+        hook_size=sc.get("hook_size", 104), hook_duration=duration, time_offset=start,
     )
     beat("render", f"Montage vertical {rc['width']}×{rc['height']} (mode {rc['layout']}) "
                    f"+ accroche en haut + sous-titres {sc['words_per_line']} mots par ligne")
     out = item_dir / "clip.mp4"
     render.render_vertical(video, ass, out, width=rc["width"], height=rc["height"],
-                           layout=rc["layout"], facecam=rc.get("facecam"), duration=duration)
+                           layout=rc["layout"], facecam=rc.get("facecam"), start=start,
+                           duration=duration)
     render.extract_thumbnail(out, item_dir / "thumb.jpg", at=min(1.5, duration / 2))
     beat("render", f"Vidéo prête ({out.stat().st_size / 1e6:.1f} Mo, {duration:.0f} s)")
 

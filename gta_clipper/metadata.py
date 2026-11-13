@@ -38,6 +38,16 @@ Accroche (hook) : le texte incrusté EN HAUT de la vidéo, lu en une seconde.
 - Concrète et explicative plutôt que vague : on comprend le sujet de la vidéo rien qu'en la lisant. "IL DÉCOUVRE L'ESSENCE SUR GTA 6", "LA VOITURE LA PLUS RAPIDE DE GTA 6", "IL VOLE UN TANK EN PLEINE VILLE" valent mieux que "MOMENT INCROYABLE" ou "IL DÉCOUVRE UN TRUC FOU". Un chiffre ou un détail précis (1v4, 10 secondes, 3 étoiles) aide.
 - Vraie : elle décrit ce que montrent les images ou la transcription, jamais un événement inventé. Si tu ne comprends pas ce qui se passe, une accroche de curiosité honnête ("SA RÉACTION VAUT TOUT") plutôt qu'une invention, et confidence à "low".
 
+Découpe (start_s, end_s) : le clip Twitch a été coupé à la main par un viewer, souvent \
+trop tôt ou trop tard (il démarre au milieu de l'action ou traîne longtemps après). \
+Les images portent leur instant (en secondes) et la transcription a des repères (t=…s). \
+Donne le début et la fin, en secondes depuis le début du clip, de la version qui garde \
+LE moment fort en entier : commence juste avant que l'action ou la phrase qui le lance \
+démarre (le spectateur doit comprendre la situation en 1 ou 2 secondes), termine juste \
+après la réaction ou la conclusion. Coupe ce qui traîne après (temps mort, écran de fin, \
+discussion sans rapport, nouvelle partie). Ne commence jamais au milieu d'une phrase. \
+Entre 15 et 60 secondes. Si le clip est déjà bien coupé, renvoie 0 et la durée totale.
+
 Corrections : la transcription vient d'une reconnaissance vocale automatique et contient \
 des erreurs (noms de streamers, termes de jeu, mots mal compris). Chaque mot est numéroté \
 [i]. Liste seulement les mots manifestement faux, avec leur numéro et le mot corrigé \
@@ -60,21 +70,31 @@ class ClipMetadata(BaseModel):
     confidence: str = Field(description="high | medium | low : à quel point le titre colle au contenu")
     hook: str = Field(description="Accroche incrustée en haut de la vidéo, 42 caractères max")
     corrections: list[Correction] = Field(description="Mots de la transcription à corriger")
+    start_s: float = Field(description="Début de la version recoupée, en secondes depuis le début du clip")
+    end_s: float = Field(description="Fin de la version recoupée, en secondes depuis le début du clip")
 
 
 def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "",
                       model: str = "claude-haiku-5-5",
                       base_hashtags: list[str] | None = None,
                       words: list | None = None, game: str = "",
-                      frames: list | None = None) -> ClipMetadata:
+                      frames: list | None = None, frame_times: list[float] | None = None,
+                      duration: float = 0.0) -> ClipMetadata:
     from .guard import Guard, LimitReached
     client = anthropic.Anthropic(max_retries=2, timeout=90)
-    if words:  # mots numérotés pour que le modèle puisse corriger la transcription
-        transcript = " ".join(f"[{i}]{w.text}" for i, w in enumerate(words))
+    if words:  # mots numérotés (corrections) avec un repère de temps toutes les ~5 s (découpe)
+        parts, mark = [], -10.0
+        for i, w in enumerate(words):
+            if w.start - mark >= 5:
+                mark = w.start
+                parts.append(f"(t={w.start:.0f}s)")
+            parts.append(f"[{i}]{w.text}")
+        transcript = " ".join(parts)
     transcript = (transcript or '')[:6000]  # un clip fait 60 s max : borne de sécurité
     user = (
         f"Streamer : {streamer_name}\n"
         f"Jeu : {game or '(non précisé)'}\n"
+        + (f"Durée du clip : {duration:.0f} s\n" if duration else "") +
         f"Titre donné au clip sur Twitch par un viewer (peut être vide ou approximatif) : "
         f"{twitch_title or '(aucun)'}\n\n"
         f"Transcription du clip (auto, peut contenir des erreurs) :\n<transcription>\n"
@@ -84,7 +104,9 @@ def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "
     if frames:  # quelques images du clip pour comprendre ce qui se passe à l'écran
         import base64
         content = [{"type": "text", "text": f"{len(frames)} images du clip, dans l'ordre :"}]
-        for f in frames:
+        for k, f in enumerate(frames):
+            if frame_times and k < len(frame_times):
+                content.append({"type": "text", "text": f"Image à {frame_times[k]:.0f} s :"})
             content.append({"type": "image", "source": {
                 "type": "base64", "media_type": "image/jpeg",
                 "data": base64.b64encode(f.read_bytes()).decode()}})
