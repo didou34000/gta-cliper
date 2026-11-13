@@ -267,7 +267,15 @@ class Reporter:
                 important=force)
             self._last_push, self._dirty = time.time(), False
         except Exception as e:  # le site ne doit jamais bloquer le bot
-            log.warning("Statut non envoyé au site : %s", e)
+            # On n'insiste pas à chaque ligne : prochain essai dans MIN_INTERVAL secondes,
+            # et plus du tout si le stockage est bloqué (quota dépassé, store suspendu).
+            self._last_push = time.time()
+            if "store_suspended" in str(e) or "HTTP 403" in str(e):
+                self.on = False
+                log.error("Stockage du site bloqué (%s) : le bot continue mais le site ne sera "
+                          "plus mis à jour pendant ce passage.", e)
+            else:
+                log.warning("Statut non envoyé au site : %s", e)
 
 
 def _now() -> str:
