@@ -6,7 +6,11 @@
 #    et le relance s'il plante. Le Mac ne se met pas en veille tant que le bot tourne
 #    (sauf capot fermé sur batterie).
 # Relancer ce script ne casse rien : il refait seulement ce qui manque.
+#
+# Option --youtube-seul : pas de service permanent (GitHub fait déjà les passages Twitch),
+# seulement l'icône « Clipper YouTube » sur le Bureau : double-clic, colle le lien, c'est parti.
 set -euo pipefail
+MODE="${1:-}"
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 LABEL="com.gtaclipper.bot"
@@ -63,6 +67,32 @@ done
 .venv/bin/python -c "import gta_clipper.pipeline, yt_dlp, faster_whisper, anthropic; print('Modules OK')"
 if grep -Eq "^R2_SECRET_ACCESS_KEY=.+" .env; then
   .venv/bin/python -m gta_clipper site-test || echo "!! Le test de liaison avec le site a échoué"
+fi
+
+if [ "$MODE" = "--youtube-seul" ]; then
+  echo "== 5/5 Icône « Clipper YouTube » sur le Bureau =="
+  launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true  # pas de bot permanent sur le Mac
+  APP="$HOME/Desktop/Clipper YouTube.command"
+  cat > "$APP" <<CMD
+#!/bin/bash
+# Double-clic : colle un lien YouTube, le bot en tire des clips et les envoie sur le site.
+cd "$ROOT"
+export PATH="$ROOT/bin:\$HOME/.deno/bin:/opt/homebrew/bin:/usr/local/bin:\$PATH"
+echo "=== Clipper une vidéo YouTube ==="
+read -r -p "Colle le lien YouTube puis Entrée : " LIEN
+[ -z "\$LIEN" ] && { echo "Pas de lien, rien à faire."; read -r -p "Entrée pour fermer."; exit 0; }
+read -r -p "Combien de clips ? (Entrée = 3) : " N
+.venv/bin/python -m gta_clipper youtube "\$LIEN" --clips "\${N:-3}"
+echo ""
+echo "Terminé. Les clips sont sur https://gta-clipper.vercel.app (onglet À valider ou À poster)."
+read -r -p "Entrée pour fermer."
+CMD
+  chmod +x "$APP"
+  xattr -d com.apple.quarantine "$APP" 2>/dev/null || true
+  [ -n "$MISSING" ] && echo "!! Il manque dans .env :$MISSING (ouvre $ROOT/.env pour les remplir)"
+  echo ""
+  echo "C'est prêt : double-clique sur « Clipper YouTube » sur ton Bureau."
+  exit 0
 fi
 
 echo "== 5/5 Service permanent (launchd) =="
