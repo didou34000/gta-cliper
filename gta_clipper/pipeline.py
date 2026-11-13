@@ -538,3 +538,119 @@ def _pick_and_make(cfg, skip_llm, rep, work, produced, already, pool):
                    twitch_title=clip.title, source_url=clip.url, skip_llm=skip_llm,
                    extra={"views": clip.view_count, "kind": "twitch_clip", "rank": n,
                           "potential": c.get("score"), "potential_reason": c.get("raison", "")})
+
+
+def run_youtube(cfg: dict, url: str, n: int = 3, streamer: str = "",
+                skip_llm: bool = False) -> list[Path]:
+    """Mode « lien YouTube » (façon Opus Clip) : analyse toute la vidéo, choisit les meilleurs
+    moments, puis monte chacun comme un clip Twitch (sous-titres, accroche, titre, site)."""
+    from . import youtube
+    from .remote import Reporter
+    guard = Guard(cfg, Path(cfg["paths"]["work"]).parent / "usage.json")
+    rep = Reporter()
+    if guard.stopped():
+        rep.beat("idle", "Arrêt d'urgence actif", "aucun passage")
+        return []
+    yc = cfg.get("youtube", {})
+    n = max(1, min(int(n or 3), int(yc.get("max_clips", 8))))
+    game = game_label(cfg)
+    cfg["_run"] = {
+        "id": os.environ.get("GITHUB_RUN_ID") or datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"),
+        "at": datetime.now(timezone.utc).isoformat(), "trigger": "lien YouTube",
+        "game": cfg["game_name"] if cfg.get("game_filter", True) else "tous les jeux",
+        "max_clips": n, "source": url,
+    }
+    rep.beat("running", "Vidéo YouTube", url, node="twitch")
+    work = Path(cfg["paths"]["work"])
+    produced: list[Path] = []
+    try:
+        if not youtube.is_youtube(url):
+            raise RuntimeError(f"Ce lien n'est pas une vidéo YouTube : {url[:120]}")
+        info = youtube.video_info(url)
+        if not info["id"] or info["duration"] <= 0:
+            raise RuntimeError("Vidéo introuvable (lien incomplet, vidéo privée ou supprimée)")
+        if info["is_live"]:
+            raise RuntimeError("C'est un live en cours : attends qu'il soit terminé.")
+        name = streamer.strip() or info["channel"] or "Le streamer"
+        rep.current = name
+        rep.streamer(name)["etat"] = "en cours"
+        max_s = float(yc.get("max_minutes", 180)) * 60
+        cut = info["duration"] > max_s
+        rep.event(f"« {info['title']} » ({youtube._ts(info['duration'])}, chaîne {info['channel']})"
+                  + (f" : trop longue, seules les {max_s / 60:.0f} premières minutes sont analysées"
+                     if cut else ""), node="twitch", force=True)
+        sid0 = f"yt-{info['id']}"
+
+        rep.event("Téléchargement du son de la vidéo (pour l'analyse)", node="twitch")
+        audio = youtube.download_audio(url, work / sid0 / "audio", max_s if cut else None)
+        samples = media.load_audio(audio)
+        dur = len(samples) / 16000
+        rep.event(f"Son téléchargé ({audio.stat().st_size / 1e6:.0f} Mo, {youtube._ts(dur)})",
+                  node="twitch")
+
+        peaks = youtube.loudness_peaks(samples)
+        rep.event(f"{len(peaks)} pic(s) de volume repérés", node="scoring")
+        wc = cfg["whisper"]
+        rep.event(f"Transcription rapide de toute la vidéo (Whisper {yc.get('analysis_model', 'small')}), "
+                  f"compte environ {max(1, dur / 600):.0f} min", node="transcription", force=True)
+        segs = youtube.rough_transcript(
+            samples, yc.get("analysis_model", "small"), wc["device"], wc["compute_type"],
+            prompt=f"Vidéo de {name} en français. " + (f"Il joue à {game}." if game else ""))
+        del samples
+        rep.event(f"{len(segs)} phrases transcrites", node="transcription")
+
+        model = cfg.get("llm", {}).get("moments_model", "claude-haiku-5-5")
+        rep.event(f"Claude ({model}) lit la transcription et choisit les {n} meilleurs moments"
+                  if not skip_llm and os.environ.get("ANTHROPIC_API_KEY")
+                  else "Sans IA : choix sur les pics de volume et les passages les plus parlés", node="scoring", force=True)
+        moments = (youtube.pick_moments(segs, peaks, n, title=info["title"],
+                                        channel=info["channel"], game=game, model=model,
+                                        duration=dur) if not skip_llm
+                   else youtube.fallback_moments(segs, peaks, n, dur))
+        if not moments:
+            rep.event("Aucun moment exploitable trouvé dans cette vidéo"
+                      + (" (aucune parole détectée : musique seule ?)" if not segs else ""), node="scoring",
+                      level="warn", force=True)
+            return []
+        rep.event("Moments retenus : " + " · ".join(
+            f"{youtube._ts(m['start'])} ({m['end'] - m['start']:.0f} s"
+            + (f", {m['score']}/10" if m["score"] else "")
+            + (f", {m['sujet']}" if m.get("sujet") else "") + ")" for m in moments),
+                  node="scoring", force=True)
+
+        already = seen_ids(cfg)
+        from .remote import seen_on_site
+        already |= seen_on_site()
+        _prune(cfg, rep)
+        for k, m in enumerate(moments, 1):
+            sid = f"{sid0}-{int(m['start'])}"
+            label = f"moment {k}/{len(moments)} à {youtube._ts(m['start'])}" + \
+                    (f" « {m['sujet']} »" if m.get("sujet") else "")
+            if sid in already or slug(sid) in already:
+                rep.event(f"Déjà fait, ignoré : {label}", node="scoring")
+                continue
+            _make_clip(cfg, rep, produced, already, sid=sid, name=name, label=label,
+                       video_fn=lambda m=m, sid=sid: media.download(
+                           url, work / sid / "source.mp4", m["start"], m["end"],
+                           max_mb=Guard.get().limits["max_download_mb"]),
+                       twitch_title=(m.get("sujet") or "")[:80],
+                       source_url=f"https://youtu.be/{info['id']}?t={int(m['start'])}",
+                       skip_llm=skip_llm,
+                       extra={"kind": "youtube", "rank": k, "potential": m["score"] or None,
+                              "potential_reason": m.get("raison", ""),
+                              "yt_title": info["title"], "yt_start": m["start"]})
+    except LimitReached as e:
+        rep.event(f"Garde-fou : {e}", level="warn", force=True)
+    except Exception as e:
+        log.exception("Lien YouTube en échec")
+        rep.stats["erreurs"] += 1
+        rep.current = ""
+        rep.beat("error", "Lien YouTube en échec", str(e)[:300], with_logs=True)
+        raise
+    finally:
+        for info_s in rep.streamers.values():
+            info_s["etat"] = "fini" if info_s["produits"] else "erreur" if info_s["erreurs"] else "non retenu"
+    rep.current = ""
+    rep.beat("idle", "Vidéo YouTube terminée",
+             f"{rep.stats['clips_produits']} clip(s) produit(s) · {guard.summary()}", with_logs=True)
+    return produced

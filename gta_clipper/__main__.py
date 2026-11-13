@@ -1,4 +1,4 @@
-"""CLI : python -m gta_clipper {run,local,review}"""
+"""CLI : python -m gta_clipper {run,youtube,local,review}"""
 from __future__ import annotations
 
 import argparse
@@ -47,6 +47,13 @@ def main() -> None:
     lo.add_argument("--no-llm", action="store_true")
     lo.add_argument("--words", help="Transcription déjà faite (JSON) au lieu de Whisper")
 
+    yt = sub.add_parser("youtube", help="Lien YouTube : le bot trouve les meilleurs moments et en fait des clips")
+    yt.add_argument("url", help="Lien de la vidéo YouTube")
+    yt.add_argument("--clips", type=int, default=3, help="Nombre de clips à sortir (3)")
+    yt.add_argument("--streamer", default="", help="Nom affiché dans les titres (sinon : nom de la chaîne)")
+    yt.add_argument("--jeu", default="", help='Jeu de la vidéo, ex. "Grand Theft Auto VI" ou "tous"')
+    yt.add_argument("--no-llm", action="store_true")
+
     sub.add_parser("site-test", help="Envoie un statut + le dernier clip local au site, pour tester la liaison")
 
     rv = sub.add_parser("review", help="Lance l'interface de validation")
@@ -58,7 +65,15 @@ def main() -> None:
                         format="%(asctime)s %(levelname)s %(message)s")
     cfg = load_config(a.config)
 
-    if a.cmd == "run":
+    if a.cmd == "youtube":
+        from .pipeline import apply_launch_overrides, run_youtube
+        if a.jeu:
+            apply_launch_overrides(cfg, {"GAME_NAME": a.jeu})
+        out = run_youtube(cfg, a.url, a.clips, a.streamer, skip_llm=a.no_llm)
+        print(f"{len(out)} clip(s) prêts" + (" (et envoyés sur le site)." if out and __import__("os").environ.get("BLOB_READ_WRITE_TOKEN") else "."))
+        for d in out:
+            print(" -", d / "clip.mp4")
+    elif a.cmd == "run":
         out = run(cfg, skip_llm=a.no_llm, chat_dir=a.chat_dir)
         print(f"{len(out)} clip(s) en attente de validation. Lance : python -m gta_clipper review")
     elif a.cmd == "loop":

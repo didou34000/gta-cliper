@@ -27,7 +27,7 @@ const NAV: { key: View; label: string; icon: string; group: string }[] = [
 // Anciens liens (?tab=pending…) toujours valables.
 const LEGACY: Record<string, View> = { pending: "valider", approved: "poster", posted: "stats" };
 
-type Search = { v?: string; tab?: string; launch?: string; prog?: string; scope?: string; net?: string };
+type Search = { v?: string; tab?: string; launch?: string; prog?: string; yt?: string; scope?: string; net?: string };
 
 export default async function Home({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
@@ -89,7 +89,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
         {view === "poster" && <ClipsView ctx={ctx} status="approved" />}
         {view === "stats" && <StatsView ctx={ctx} scope={sp.scope === "all" ? "all" : "bot"} net={sp.net} />}
         {view === "bot" && <BotView ctx={ctx} />}
-        {view === "programmation" && <ProgView ctx={ctx} launch={sp.launch} prog={sp.prog} />}
+        {view === "programmation" && <ProgView ctx={ctx} launch={sp.launch} prog={sp.prog} yt={sp.yt} />}
         {view === "reglages" && <SettingsView ctx={ctx} />}
         {state.key === "running" && ["accueil", "bot", "valider"].includes(view) && <AutoRefresh seconds={15} />}
       </main>

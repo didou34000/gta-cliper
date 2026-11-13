@@ -43,6 +43,11 @@ else
 fi
 export PATH="$ROOT/bin:$PATH"
 ffmpeg -hide_banner -version | head -1
+# deno : yt-dlp en a besoin pour télécharger depuis YouTube (mode « lien YouTube »)
+if ! command -v deno >/dev/null 2>&1 && [ ! -x "$HOME/.deno/bin/deno" ]; then
+  if command -v brew >/dev/null 2>&1; then brew install deno; else curl -fsSL https://deno.land/install.sh | sh -s -- -y; fi
+fi
+export PATH="$HOME/.deno/bin:$PATH"
 
 echo "== 3/5 Configuration =="
 [ -f config.yaml ] || cp config.example.yaml config.yaml

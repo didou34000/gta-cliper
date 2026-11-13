@@ -51,6 +51,24 @@ python -m gta_clipper local https://www.twitch.tv/videos/123456 --start 3600 --e
 python -m gta_clipper local ma_video.mp4 --streamer Squeezie
 ```
 
+## Lien YouTube (façon Opus Clip)
+
+Tu donnes le lien d'une vidéo longue, le bot trouve tout seul les meilleurs moments et en fait des clips 9:16 sous-titrés :
+
+1. il télécharge seulement le son (≈ 50 Mo par heure) ;
+2. il repère les pics de volume (cris, rires, explosions) ;
+3. il transcrit toute la vidéo vite (Whisper `small`) ;
+4. Claude (Haiku par défaut, < 1 centime par heure de vidéo) lit la transcription et choisit les moments de 20 à 60 s ;
+5. chaque moment est téléchargé seul, puis passe par la chaîne habituelle (Whisper précis, titre, accroche, sous-titres roses, site, validation auto si note ≥ seuil).
+
+Depuis le site : **Programmation > Clipper une vidéo YouTube**. Depuis le Mac :
+
+```bash
+python -m gta_clipper youtube "https://www.youtube.com/watch?v=XXXX" --clips 3 --jeu "Grand Theft Auto VI"
+```
+
+YouTube bloque régulièrement les serveurs (GitHub Actions compris) avec « Sign in to confirm you're not a bot ». Si ça arrive : soit tu lances la commande depuis ton Mac (connexion maison, ça passe), soit tu ajoutes le secret GitHub `YT_COOKIES` (contenu d'un fichier cookies.txt exporté d'un compte YouTube **jetable**, pas ton compte principal). yt-dlp a aussi besoin de `deno` pour YouTube (`brew install deno` sur Mac ; déjà prévu sur GitHub).
+
 ## Site de suivi
 
 Le dossier `site/` contient le tableau de bord privé (Vercel) : statut du bot en direct, clips scorés, validation, clips à poster et publiés, frise explicative. Voir `site/README.md` pour la mise en ligne. Une fois `BLOB_READ_WRITE_TOKEN` défini sur le PC du bot, chaque passage envoie ses clips et son statut au site ; la validation se fait alors sur le site (l'interface locale `review` reste disponible).

@@ -9,7 +9,7 @@ from pathlib import Path
 
 def download(url: str, out: Path, start: float | None = None, end: float | None = None,
              max_mb: int = 400) -> Path:
-    """Télécharge un clip Twitch, ou une section d'une VOD si start/end sont donnés."""
+    """Télécharge un clip Twitch / une vidéo YouTube, ou seulement la section start-end."""
     import yt_dlp
     from yt_dlp.utils import download_range_func
 
@@ -22,12 +22,19 @@ def download(url: str, out: Path, start: float | None = None, end: float | None 
         "noprogress": True,
         "max_filesize": max_mb * 1024 * 1024,  # garde-fou taille
     }
+    from .youtube import is_youtube, ydl_opts, _wrap
+    yt = is_youtube(url)
+    if yt:  # YouTube sépare image et son : on prend les deux (sinon 360p seulement)
+        opts = ydl_opts(**{**opts, "format": "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b"})
     if start is not None and end is not None:
         opts["download_ranges"] = download_range_func(None, [(start, end)])
         opts["force_keyframes_at_cuts"] = True
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        path = Path(ydl.prepare_filename(info))
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            path = Path(ydl.prepare_filename(info))
+    except Exception as e:
+        raise (_wrap(e) if yt else e) from e
     if path.suffix != ".mp4" and path.with_suffix(".mp4").exists():
         path = path.with_suffix(".mp4")
     if not path.exists():
