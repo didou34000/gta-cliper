@@ -140,6 +140,7 @@ jobs:
         run: |
           if [ -z "$TWITCH_CLIENT_SECRET" ]; then echo "::error::Secret TWITCH_CLIENT_SECRET manquant"; exit 1; fi
           if [ -z "$R2_SECRET_ACCESS_KEY" ]; then echo "::warning::Clés R2 manquantes (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL) : rien ne sera envoyé au site"; fi
+          if [ -n "$R2_ACCOUNT_ID" ] && ! printf '%s' "$R2_ACCOUNT_ID" | grep -qiE '[0-9a-f]{32}'; then echo "::error::Le secret R2_ACCOUNT_ID ne contient pas l'Account ID Cloudflare (32 caractères 0-9 a-f)"; fi
       - name: Passage du bot
         run: python -m gta_clipper run
       - uses: actions/cache/save@v4
