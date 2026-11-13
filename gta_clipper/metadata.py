@@ -17,7 +17,10 @@ précise + objet concret + jeu. Exemples : "Squeezie découvre les stations esse
 de lui sur GTA 6", "Gotaga se fait braquer en 10 secondes sur GTA 6".
 - Nomme l'élément concret découvert ou montré (voiture, essence, arme, quartier, PNJ, \
 mécanique, police, météo, animaux…) plutôt qu'un mot vague ("un truc", "quelque chose de fou").
-- Mets le nom du jeu dans le titre (ex. "sur GTA 6") quand il tient dans la limite.
+- Mets le nom du jeu indiqué dans le message (ex. "sur GTA 6") quand il tient dans la limite. \
+Les exemples ci-dessus parlent de GTA 6, mais n'écris JAMAIS "GTA 6" (ni un autre jeu) si ce \
+n'est pas le jeu indiqué. Si le jeu est "(non précisé)", ne cite aucun jeu dans le titre, \
+l'accroche, la description ni les hashtags.
 - 70 caractères max, en français naturel, sans guillemets, 0 ou 1 emoji.
 - Le titre doit décrire ce qui se passe VRAIMENT dans la transcription. \
 N'invente pas d'événement, de lieu ou de réaction absents du contenu. \

@@ -190,7 +190,13 @@ info surprenante, moment d'émotion. Un pic de volume aide mais ne suffit pas ;
 - pas de chevauchement entre deux clips ;
 - note chaque moment de 1 à 10 (potentiel viral), honnêtement : un moment moyen vaut 4-5.
 Donne pour chacun le sujet concret en quelques mots (ex. "découvre les stations essence", \
-"se fait braquer par un PNJ") et une raison courte."""
+"se fait braquer par un PNJ") et une raison courte.
+
+Indique aussi le jeu VRAIMENT joué dans la vidéo (champ jeu), tel qu'on l'écrirait dans un \
+titre : "GTA 6", "GTA 5", "Minecraft", "Fortnite", "Prop Hunt"… Déduis-le du titre de la \
+vidéo et de la transcription, jamais du jeu suggéré dans le message s'il ne colle pas. \
+Si un mode de jeu est cité sans le jeu (ex. "Prop Hunt"), écris le mode. \
+Laisse vide si tu n'es pas sûr ou si ce n'est pas une vidéo de jeu."""
 
 
 class Moment(BaseModel):
@@ -202,18 +208,20 @@ class Moment(BaseModel):
 
 
 class Moments(BaseModel):
+    jeu: str = Field(description="Jeu réellement joué, nom court pour un titre, vide si incertain")
     moments: list[Moment]
 
 
 def pick_moments(segs: list[Seg], peaks: list[Peak], n: int, *, title: str = "",
                  channel: str = "", game: str = "", model: str = "claude-haiku-5-5",
-                 duration: float = 0) -> list[dict]:
-    """Demande à Claude les n meilleurs moments. Sans clé / en cas d'échec : pics de volume."""
+                 duration: float = 0, found: dict | None = None) -> list[dict]:
+    """Demande à Claude les n meilleurs moments. Sans clé / en cas d'échec : pics de volume.
+    Si `found` est fourni, on y range le jeu reconnu par Claude (found["jeu"])."""
     from .guard import Guard
     if os.environ.get("ANTHROPIC_API_KEY") and segs and Guard.get().allow_llm():
         lines = "\n".join(f"[{_ts(s.start)}-{_ts(s.end)}] {s.text}" for s in segs)
         pk = ", ".join(f"{_ts(p.t)} (force {p.z})" for p in peaks) or "aucun"
-        msg = (f"Vidéo : « {title} » · chaîne : {channel or '?'} · jeu : {game or '?'} · "
+        msg = (f"Vidéo : « {title} » · chaîne : {channel or '?'} · jeu supposé : {game or '?'} · "
                f"durée {_ts(duration)}.\nDonne les {n + 2} meilleurs moments, du meilleur au "
                f"moins bon (temps en secondes).\n\nPics de volume : {pk}\n\n"
                f"Transcription :\n{lines[:400_000]}")
@@ -226,6 +234,8 @@ def pick_moments(segs: list[Seg], peaks: list[Peak], n: int, *, title: str = "",
             from . import usage
             usage.llm(model, resp)
             got = resp.parsed_output.moments if resp.parsed_output else []
+            if found is not None and resp.parsed_output:
+                found["jeu"] = " ".join(resp.parsed_output.jeu.split())[:40]
             out = _clean([m.model_dump() for m in got], segs, duration)
             if out:
                 return out[:n]
