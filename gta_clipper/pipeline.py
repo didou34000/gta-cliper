@@ -88,6 +88,8 @@ SHORT_GAME = {"Grand Theft Auto VI": "GTA 6", "Grand Theft Auto V": "GTA 5"}
 
 def game_label(cfg: dict) -> str:
     """Nom court du jeu pour les titres (« » si tous les jeux)."""
+    if "_game_override" in cfg:  # lien YouTube : le jeu reconnu dans la vidéo, pas celui du réglage
+        return cfg["_game_override"]
     if not cfg.get("game_filter", True):
         return ""
     g = cfg.get("game_name", "")
@@ -176,7 +178,7 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
         beat("transcription", f"Transcription Whisper de {duration:.0f} s de vidéo "
                               f"(modèle {wc['model']}, sur {wc['device']})")
         words = media.transcribe(video, wc["model"], wc["device"], wc["compute_type"],
-                                 streamer=streamer_name, game=cfg.get("game_name", "") if cfg.get("game_filter", True) else "")
+                                 streamer=streamer_name, game=game_label(cfg))
     words = [w for w in words if w.start < duration]
     beat("transcription", f"{len(words)} mots reconnus" if words
          else "Aucune parole détectée : clip sans sous-titres")
@@ -187,7 +189,7 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
     game = game_label(cfg)
     meta = {"title": f"{streamer_name} sur {game}" if game else f"{streamer_name} en live",
             "alt_titles": [], "description": "",
-            "hashtags": cfg["llm"]["base_hashtags"] if game.startswith("GTA") else [], "confidence": "low",
+            "hashtags": cfg["llm"]["base_hashtags"] if game == "GTA 6" else [], "confidence": "low",
             "hook": fallback_hook(streamer_name, twitch_title, game)}
     import os
     if not skip_llm and not os.environ.get("ANTHROPIC_API_KEY"):
@@ -200,7 +202,7 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
             frames = media.sample_frames(video, item_dir / "frames", duration, n=n_frames)
             times = [duration * (int(f.stem) + 0.5) / n_frames for f in frames]
             m = generate_metadata(streamer_name, text, twitch_title, cfg["llm"]["model"],
-                                  cfg["llm"]["base_hashtags"] if game.startswith("GTA") else [],
+                                  cfg["llm"]["base_hashtags"] if game == "GTA 6" else [],
                                   words=words, game=game, frames=frames, frame_times=times,
                                   duration=duration).model_dump()
             cut = trim_window(m.pop("start_s", 0.0), m.pop("end_s", duration), duration, words,
@@ -625,11 +627,14 @@ def run_youtube(cfg: dict, url: str, n: int = 3, streamer: str = "",
         return []
     yc = cfg.get("youtube", {})
     n = max(1, min(int(n or 3), int(yc.get("max_clips", 8))))
-    game = game_label(cfg)
+    # Une vidéo YouTube peut être n'importe quel jeu : on ne suppose pas celui du réglage
+    # (sinon « sur GTA 6 » dans le titre d'un Prop Hunt). Claude le reconnaît plus bas.
+    game = ""
+    cfg["_game_override"] = ""
     cfg["_run"] = {
         "id": os.environ.get("GITHUB_RUN_ID") or datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"),
         "at": datetime.now(timezone.utc).isoformat(), "trigger": "lien YouTube",
-        "game": cfg["game_name"] if cfg.get("game_filter", True) else "tous les jeux",
+        "game": "reconnu dans la vidéo",
         "max_clips": n, "source": url,
     }
     rep.beat("running", "Vidéo YouTube", url, node="twitch")
@@ -667,7 +672,7 @@ def run_youtube(cfg: dict, url: str, n: int = 3, streamer: str = "",
                   f"compte environ {max(1, dur / 600):.0f} min", node="transcription", force=True)
         segs = youtube.rough_transcript(
             samples, yc.get("analysis_model", "small"), wc["device"], wc["compute_type"],
-            prompt=f"Vidéo de {name} en français. " + (f"Il joue à {game}." if game else ""))
+            prompt=f"Vidéo de {name} en français. {info['title']}")
         del samples
         rep.event(f"{len(segs)} phrases transcrites", node="transcription")
 
@@ -675,10 +680,15 @@ def run_youtube(cfg: dict, url: str, n: int = 3, streamer: str = "",
         rep.event(f"Claude ({model}) lit la transcription et choisit les {n} meilleurs moments"
                   if not skip_llm and os.environ.get("ANTHROPIC_API_KEY")
                   else "Sans IA : choix sur les pics de volume et les passages les plus parlés", node="scoring", force=True)
+        found: dict = {}
         moments = (youtube.pick_moments(segs, peaks, n, title=info["title"],
                                         channel=info["channel"], game=game, model=model,
-                                        duration=dur) if not skip_llm
+                                        duration=dur, found=found) if not skip_llm
                    else youtube.fallback_moments(segs, peaks, n, dur))
+        cfg["_game_override"] = found.get("jeu", "")
+        cfg["_run"]["game"] = cfg["_game_override"] or "non reconnu"
+        rep.event(f"Jeu reconnu : {cfg['_game_override']}" if cfg["_game_override"]
+                  else "Jeu non reconnu : les titres ne citeront pas de jeu", node="scoring")
         if not moments:
             rep.event("Aucun moment exploitable trouvé dans cette vidéo"
                       + (" (aucune parole détectée : musique seule ?)" if not segs else ""), node="scoring",

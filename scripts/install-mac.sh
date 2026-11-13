@@ -27,25 +27,33 @@ UV="$(command -v uv || echo "$HOME/.local/bin/uv")"
 "$UV" pip install --python .venv/bin/python -r requirements.txt
 
 echo "== 2/5 ffmpeg =="
-if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then
-  echo "ffmpeg déjà installé : $(command -v ffmpeg)"
+# Le bot incruste les sous-titres avec le filtre « ass » (libass). Le ffmpeg Homebrew
+# standard ne l'a plus : sans lui, chaque clip échoue. On vérifie et on prend ffmpeg-full.
+export PATH="$ROOT/bin:$PATH"
+has_ass() { command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1 \
+  && ffmpeg -hide_banner -filters 2>/dev/null | grep -qE '^ ... ass '; }
+if has_ass; then
+  echo "ffmpeg déjà installé avec les sous-titres : $(command -v ffmpeg)"
 elif command -v brew >/dev/null 2>&1; then
-  brew install ffmpeg
+  brew install ffmpeg-full
+  FF="$(brew --prefix ffmpeg-full)/bin"
+  for t in ffmpeg ffprobe; do ln -sf "$FF/$t" "bin/$t"; done
 else
   ARCH="$(uname -m)"
+  rm -f bin/ffmpeg bin/ffprobe
   if [ "$ARCH" = "arm64" ]; then
     for t in ffmpeg ffprobe; do
-      [ -x "bin/$t" ] || { curl -fL "https://www.osxexperts.net/${t}80arm.zip" -o "/tmp/$t.zip" && unzip -o -q "/tmp/$t.zip" -d bin; }
+      curl -fL "https://www.osxexperts.net/${t}80arm.zip" -o "/tmp/$t.zip" && unzip -o -q "/tmp/$t.zip" -d bin
     done
   else
     for t in ffmpeg ffprobe; do
-      [ -x "bin/$t" ] || { curl -fL "https://evermeet.cx/ffmpeg/getrelease/$t/zip" -o "/tmp/$t.zip" && unzip -o -q "/tmp/$t.zip" -d bin; }
+      curl -fL "https://evermeet.cx/ffmpeg/getrelease/$t/zip" -o "/tmp/$t.zip" && unzip -o -q "/tmp/$t.zip" -d bin
     done
   fi
   chmod +x bin/ffmpeg bin/ffprobe
   xattr -d com.apple.quarantine bin/ffmpeg bin/ffprobe 2>/dev/null || true
 fi
-export PATH="$ROOT/bin:$PATH"
+has_ass || { echo "ERREUR : ffmpeg sans le filtre « ass » (sous-titres). Installe Homebrew puis relance ce script."; exit 1; }
 ffmpeg -hide_banner -version | head -1
 # deno : yt-dlp en a besoin pour télécharger depuis YouTube (mode « lien YouTube »)
 if ! command -v deno >/dev/null 2>&1 && [ ! -x "$HOME/.deno/bin/deno" ]; then
