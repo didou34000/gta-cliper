@@ -15,7 +15,7 @@ DEFAULTS = {
     "max_new_clips_per_run": 10,    # clips fabriqués par passage
     "max_new_clips_per_day": 40,    # clips fabriqués par jour
     "max_llm_calls_per_day": 60,    # appels à Claude par jour (titres)
-    "max_site_uploads_per_day": 600,  # envois vers Vercel Blob par jour (statuts + vidéos)
+    "max_site_uploads_per_day": 600,  # envois vers le stockage R2 par jour (statuts + vidéos)
     "max_consecutive_errors": 5,    # échecs d'affilée avant d'arrêter le passage
     "max_download_mb": 400,         # taille max d'une vidéo téléchargée
 }

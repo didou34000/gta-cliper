@@ -1,62 +1,49 @@
 """Planification réglée depuis le site.
 
-GitHub lance ce petit script toutes les 20 minutes (sans rien installer). Il lit le dernier
-réglage enregistré par le site dans Vercel Blob (schedule/config-<ms>.json) et décide si
-c'est l'heure d'un passage. Si oui, il note l'heure (schedule/last-run.json) et donne au
-passage le jeu, le nombre de streamers et le nombre de clips choisis.
+GitHub lance ce petit script toutes les 20 minutes (sans rien installer). Il lit le réglage
+enregistré par le site dans le stockage R2 (schedule/config.json) et décide si c'est l'heure
+d'un passage. Si oui, il note l'heure (schedule/last-run.json) et donne au passage le jeu,
+le nombre de streamers et le nombre de clips choisis.
 
-Uniquement la bibliothèque standard : il tourne avant l'installation des dépendances.
+Coût par contrôle : 2 lectures (classe B), plus 1 écriture (classe A) seulement s'il lance
+un passage. Aucun listage. Bibliothèque standard uniquement : il tourne avant l'installation
+des dépendances.
 """
 from __future__ import annotations
 
 import json
 import os
 import sys
-import time
-import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
 
-API = os.environ.get("VERCEL_BLOB_API_URL", "https://vercel.com/api/blob")
-HEADERS = {"x-api-version": "12"}
+from . import s3lite
+
 TOLERANCE_S = 120  # GitHub déclenche souvent avec une ou deux minutes de retard
 
 
-def _req(url: str, method: str = "GET", data: bytes | None = None, headers: dict | None = None):
-    token = os.environ["BLOB_READ_WRITE_TOKEN"]
-    h = {"authorization": f"Bearer {token}", **HEADERS, **(headers or {})}
-    r = urllib.request.urlopen(urllib.request.Request(url, data=data, method=method, headers=h),
-                               timeout=30)
-    return json.loads(r.read() or b"{}")
-
-
-def list_schedule() -> list[dict]:
-    q = urllib.parse.urlencode({"prefix": "schedule/", "limit": "1000"})
-    return _req(f"{API}/?{q}").get("blobs", [])
-
-
-def latest_config(blobs: list[dict]) -> dict | None:
-    cfgs = sorted((b for b in blobs if b["pathname"].startswith("schedule/config-")),
-                  key=lambda b: b["uploadedAt"])
-    if not cfgs:
+def _get_json(key: str) -> dict | None:
+    raw = s3lite.get(key)
+    try:
+        return json.loads(raw) if raw else None
+    except ValueError:
         return None
-    with urllib.request.urlopen(cfgs[-1]["url"], timeout=30) as r:  # nom unique : pas de cache périmé
-        return json.loads(r.read())
 
 
-def last_run(blobs: list[dict]) -> datetime | None:
-    for b in blobs:
-        if b["pathname"] == "schedule/last-run.json":
-            return datetime.fromisoformat(b["uploadedAt"].replace("Z", "+00:00"))
-    return None
+def latest_config() -> dict | None:
+    return _get_json("schedule/config.json")
+
+
+def last_run() -> datetime | None:
+    d = _get_json("schedule/last-run.json")
+    try:
+        return datetime.fromisoformat(d["at"].replace("Z", "+00:00")) if d else None
+    except (KeyError, ValueError):
+        return None
 
 
 def mark_run(now: datetime) -> None:
-    q = urllib.parse.urlencode({"pathname": "schedule/last-run.json"})
-    _req(f"{API}/?{q}", method="PUT", data=json.dumps({"at": now.isoformat()}).encode(),
-         headers={"x-vercel-blob-access": "public", "x-content-type": "application/json",
-                  "x-add-random-suffix": "0", "x-allow-overwrite": "1",
-                  "x-cache-control-max-age": "60"})
+    s3lite.put("schedule/last-run.json", json.dumps({"at": now.isoformat()}).encode(),
+               "application/json")
 
 
 def decide(cfg: dict | None, last: datetime | None, now: datetime) -> tuple[bool, str]:
@@ -72,13 +59,12 @@ def decide(cfg: dict | None, last: datetime | None, now: datetime) -> tuple[bool
 def main() -> int:
     out = os.environ.get("GITHUB_OUTPUT")
     now = datetime.now(timezone.utc)
-    if not os.environ.get("BLOB_READ_WRITE_TOKEN"):
-        print("BLOB_READ_WRITE_TOKEN manquant : programmation impossible")
+    if not s3lite.configured():
+        print("Clés R2 manquantes (R2_ACCOUNT_ID…) : programmation impossible")
         run, why, cfg = False, "pas de stockage", None
     else:
-        blobs = list_schedule()
-        cfg = latest_config(blobs)
-        run, why = decide(cfg, last_run(blobs), now)
+        cfg = latest_config()
+        run, why = decide(cfg, last_run(), now)
         if run:
             mark_run(now)
     print(why)

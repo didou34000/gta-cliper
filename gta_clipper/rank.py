@@ -81,6 +81,8 @@ def rank_candidates(cands: list[dict], game: str = "", model: str = "claude-haik
             messages=[{"role": "user", "content": content}],
             output_format=Ranking,
         )
+        from . import usage
+        usage.llm(model, resp)
         scores = {s.n: s for s in (resp.parsed_output.scores if resp.parsed_output else [])}
     except Exception as e:  # miniature introuvable, panne… : on garde l'ordre par vues
         log.warning("Présélection IA impossible : %s", e)

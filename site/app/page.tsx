@@ -2,6 +2,8 @@ import LiveBar from "./LiveBar";
 import { latestRun } from "@/lib/github";
 import { loadClipsAndSize, loadHeartbeat } from "@/lib/data";
 import { loadSchedule } from "@/lib/schedule";
+import { countPage, flushSiteOps, r2Configured } from "@/lib/r2";
+import { loadUsage } from "@/lib/usage";
 import { loadStats } from "@/lib/stats";
 import { botState, type Ctx } from "./ctx";
 import Overview from "./views/Overview";
@@ -22,7 +24,7 @@ const NAV: { key: View; label: string; icon: string; group: string }[] = [
   { key: "stats", label: "Publiés & stats", icon: "▮", group: "Clips" },
   { key: "bot", label: "Suivi du bot", icon: "●", group: "Bot" },
   { key: "programmation", label: "Lancer le bot", icon: "◷", group: "Bot" },
-  { key: "reglages", label: "Connexions & coûts", icon: "⚙", group: "Bot" },
+  { key: "reglages", label: "Consommation & quotas", icon: "⚙", group: "Bot" },
 ];
 
 // Anciens liens (?tab=pending…) toujours valables.
@@ -35,14 +37,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   const want = sp.v ?? (sp.tab ? LEGACY[sp.tab] : undefined) ?? (sp.launch || sp.prog ? "programmation" : "accueil");
   const view = (NAV.find((n) => n.key === want)?.key ?? "accueil") as View;
 
-  const [{ last }, { clips, bytes }, { schedule, lastRun }, stats, run] = await Promise.all([
+  countPage();
+  const [{ last }, { clips, bytes }, { schedule, lastRun }, stats, run, usage] = await Promise.all([
     loadHeartbeat(), loadClipsAndSize(), loadSchedule(), loadStats(), latestRun(),
+    view === "reglages" ? loadUsage() : Promise.resolve(null),
   ]);
+  await flushSiteOps().catch(() => {});
   const sent = /^\d{13}$/.test(sp.sent ?? "") ? Number(sp.sent) : undefined;
   const state = botState(last);
   const ctx: Ctx = {
     clips, bytes, last, state, schedule, lastRun, stats,
-    configured: !!process.env.BLOB_READ_WRITE_TOKEN,
+    configured: r2Configured(),
     counts: {
       pending: clips.filter((c) => c.status === "pending").length,
       approved: clips.filter((c) => c.status === "approved").length,
@@ -86,14 +91,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
 
       <main className="main">
         <LiveBar key={sent ?? 0} initial={{ run, beat: last, now: new Date().toISOString() }} sent={sent} full={view === "bot"} />
-        {!ctx.configured && <p className="banner">Stockage non configuré : la variable BLOB_READ_WRITE_TOKEN manque sur Vercel.</p>}
+        {!ctx.configured && <p className="banner">Stockage non configuré : les clés R2 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL) manquent sur Vercel.</p>}
         {view === "accueil" && <Overview ctx={ctx} />}
         {view === "valider" && <ClipsView ctx={ctx} status="pending" />}
         {view === "poster" && <ClipsView ctx={ctx} status="approved" />}
         {view === "stats" && <StatsView ctx={ctx} scope={sp.scope === "all" ? "all" : "bot"} net={sp.net} />}
         {view === "bot" && <BotView ctx={ctx} />}
         {view === "programmation" && <ProgView ctx={ctx} launch={sp.launch} prog={sp.prog} yt={sp.yt} />}
-        {view === "reglages" && <SettingsView ctx={ctx} />}
+        {view === "reglages" && usage && <SettingsView ctx={ctx} usage={usage} />}
       </main>
     </div>
   );

@@ -71,7 +71,7 @@ YouTube bloque régulièrement les serveurs (GitHub Actions compris) avec « Sig
 
 ## Site de suivi
 
-Le dossier `site/` contient le tableau de bord privé (Vercel) : statut du bot en direct, clips scorés, validation, clips à poster et publiés, frise explicative. Voir `site/README.md` pour la mise en ligne. Une fois `BLOB_READ_WRITE_TOKEN` défini sur le PC du bot, chaque passage envoie ses clips et son statut au site ; la validation se fait alors sur le site (l'interface locale `review` reste disponible).
+Le dossier `site/` contient le tableau de bord privé (Vercel) : statut du bot en direct, clips scorés, validation, clips à poster et publiés, frise explicative. Voir `site/README.md` pour la mise en ligne. Une fois les clés R2 (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_URL`) définies sur le PC du bot, chaque passage envoie ses clips et son statut au site ; la validation se fait alors sur le site (l'interface locale `review` reste disponible).
 
 ## Détection des moments forts
 

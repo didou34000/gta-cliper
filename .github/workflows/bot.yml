@@ -48,7 +48,10 @@ jobs:
       - name: Est-ce l'heure d'un passage ?
         id: plan
         env:
-          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
           IN_JEU: ${{ inputs.jeu }}
           IN_TOP: ${{ inputs.top_streamers }}
           IN_MAX: ${{ inputs.max_clips }}
@@ -73,7 +76,10 @@ jobs:
       TWITCH_CLIENT_ID: ${{ vars.TWITCH_CLIENT_ID || '7t3dj86daadls0hj8rru2y2nuxxx2z' }}
       TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
       STOP: ${{ vars.STOP }}               # variable STOP=1 : arrêt d'urgence
       WHISPER_MODEL: ${{ vars.WHISPER_MODEL || 'large-v3-turbo' }}
       GAME_NAME: ${{ needs.check.outputs.jeu }}
@@ -133,7 +139,7 @@ jobs:
       - name: Vérifier les clés
         run: |
           if [ -z "$TWITCH_CLIENT_SECRET" ]; then echo "::error::Secret TWITCH_CLIENT_SECRET manquant"; exit 1; fi
-          if [ -z "$BLOB_READ_WRITE_TOKEN" ]; then echo "::warning::BLOB_READ_WRITE_TOKEN manquant : rien ne sera envoyé au site"; fi
+          if [ -z "$R2_SECRET_ACCESS_KEY" ]; then echo "::warning::Clés R2 manquantes (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL) : rien ne sera envoyé au site"; fi
       - name: Passage du bot
         run: python -m gta_clipper run
       - uses: actions/cache/save@v4

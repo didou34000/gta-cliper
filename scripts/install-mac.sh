@@ -57,11 +57,11 @@ grep -q "^  font:" config.yaml && sed -i '' 's/^  font: .*/  font: "Arial Black"
 
 echo "== 4/5 Vérification =="
 MISSING=""
-for k in TWITCH_CLIENT_ID TWITCH_CLIENT_SECRET BLOB_READ_WRITE_TOKEN ANTHROPIC_API_KEY; do
+for k in TWITCH_CLIENT_ID TWITCH_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_PUBLIC_URL ANTHROPIC_API_KEY; do
   grep -Eq "^$k=.+" .env || MISSING="$MISSING $k"
 done
 .venv/bin/python -c "import gta_clipper.pipeline, yt_dlp, faster_whisper, anthropic; print('Modules OK')"
-if grep -Eq "^BLOB_READ_WRITE_TOKEN=.+" .env; then
+if grep -Eq "^R2_SECRET_ACCESS_KEY=.+" .env; then
   .venv/bin/python -m gta_clipper site-test || echo "!! Le test de liaison avec le site a échoué"
 fi
 
@@ -89,7 +89,7 @@ cat > "$PLIST" <<PL
 </dict></plist>
 PL
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-if [ -n "$MISSING" ] && echo "$MISSING" | grep -q "TWITCH_CLIENT_SECRET\|BLOB_READ_WRITE_TOKEN"; then
+if [ -n "$MISSING" ] && echo "$MISSING" | grep -q "TWITCH_CLIENT_SECRET\|R2_SECRET_ACCESS_KEY"; then
   echo ""
   echo "!! Il manque dans .env :$MISSING"
   echo "   Le service est prêt mais PAS démarré. Complète .env puis relance : bash scripts/install-mac.sh"

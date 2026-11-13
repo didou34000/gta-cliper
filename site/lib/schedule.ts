@@ -1,8 +1,8 @@
 // Programmation des passages, réglée depuis le site et lue par GitHub toutes les 20 min
 // (gta_clipper/schedule.py).
-//  schedule/config-<ms>.json : chaque réglage enregistré (jamais écrasé, le plus récent gagne)
-//  schedule/last-run.json    : heure du dernier passage programmé (écrit par le bot)
-import { list, put } from "@vercel/blob";
+//  schedule/config.json   : le réglage en cours (nom fixe, lu directement : 1 lecture, pas de listage)
+//  schedule/last-run.json : heure du dernier passage programmé (écrit par GitHub)
+import { getJsonKey, putObject, r2Configured } from "./r2";
 
 export type Schedule = {
   enabled: boolean;
@@ -29,25 +29,14 @@ export const AUTO_OPTIONS = [0, 6, 7, 8, 9];
 export const HOURS_OPTIONS = [6, 12, 24, 48, 72, 100, 168, 200, 336, 720];
 
 export async function loadSchedule(): Promise<{ schedule: Schedule; lastRun: string | null }> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return { schedule: DEFAULT_SCHEDULE, lastRun: null };
-  try {
-    const { blobs } = await list({ prefix: "schedule/", limit: 1000 });
-    const cfgs = blobs.filter((b) => b.pathname.startsWith("schedule/config-"))
-      .sort((a, b) => +new Date(a.uploadedAt) - +new Date(b.uploadedAt));
-    const last = blobs.find((b) => b.pathname === "schedule/last-run.json");
-    let schedule = DEFAULT_SCHEDULE;
-    if (cfgs.length) {
-      const r = await fetch(cfgs[cfgs.length - 1].url, { next: { revalidate: 86400 } });
-      if (r.ok) schedule = { ...DEFAULT_SCHEDULE, ...(await r.json()) };
-    }
-    return { schedule, lastRun: last ? new Date(last.uploadedAt).toISOString() : null };
-  } catch {
-    return { schedule: DEFAULT_SCHEDULE, lastRun: null };
-  }
+  if (!r2Configured()) return { schedule: DEFAULT_SCHEDULE, lastRun: null };
+  const [cfg, last] = await Promise.all([
+    getJsonKey<Partial<Schedule>>("schedule/config.json"),
+    getJsonKey<{ at?: string }>("schedule/last-run.json"),
+  ]);
+  return { schedule: { ...DEFAULT_SCHEDULE, ...(cfg ?? {}) }, lastRun: last?.at ?? null };
 }
 
 export async function saveSchedule(s: Schedule) {
-  await put(`schedule/config-${Date.now()}.json`, JSON.stringify({ ...s, at: new Date().toISOString() }), {
-    access: "public", contentType: "application/json", addRandomSuffix: true,
-  });
+  await putObject("schedule/config.json", JSON.stringify({ ...s, at: new Date().toISOString() }));
 }
