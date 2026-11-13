@@ -1,0 +1,23 @@
+# Test temporaire : YouTube laisse-t-il télécharger depuis les serveurs GitHub ?
+name: Test YouTube (temporaire)
+on:
+  push:
+    branches: [claude/project-thread-uxcv0v]
+    paths: [.github/workflows/yt-test.yml]
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: denoland/setup-deno@v2
+        with: { deno-version: v2.x }
+      - run: pip install -q -U "yt-dlp[default]"
+      - name: Test 1 (clients par defaut)
+        continue-on-error: true
+        run: yt-dlp -f "bv*[height<=720]+ba/b" -o t1.mp4 "https://www.youtube.com/watch?v=jNQXAC9IVRw" 2>&1 | tail -6; ls -la t1* || true
+      - name: Test 2 (video longue, 30 s seulement)
+        continue-on-error: true
+        run: yt-dlp -f "bv*[height<=720]+ba/b" --download-sections "*60-90" -o t2.mp4 "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | tail -6; ls -la t2* || true
+      - name: Test 3 (client tv)
+        continue-on-error: true
+        run: yt-dlp --extractor-args "youtube:player_client=tv,web_safari" -f "b[height<=720]/b" -o t3.mp4 "https://www.youtube.com/watch?v=jNQXAC9IVRw" 2>&1 | tail -6; ls -la t3* || true
