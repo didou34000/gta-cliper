@@ -1,4 +1,5 @@
-import AutoRefresh from "./AutoRefresh";
+import LiveBar from "./LiveBar";
+import { latestRun } from "@/lib/github";
 import { loadClipsAndSize, loadHeartbeat } from "@/lib/data";
 import { loadSchedule } from "@/lib/schedule";
 import { loadStats } from "@/lib/stats";
@@ -19,24 +20,25 @@ const NAV: { key: View; label: string; icon: string; group: string }[] = [
   { key: "valider", label: "À valider", icon: "✓", group: "Clips" },
   { key: "poster", label: "À poster", icon: "↗", group: "Clips" },
   { key: "stats", label: "Publiés & stats", icon: "▮", group: "Clips" },
-  { key: "bot", label: "Bot en direct", icon: "●", group: "Bot" },
-  { key: "programmation", label: "Programmation", icon: "◷", group: "Bot" },
+  { key: "bot", label: "Suivi du bot", icon: "●", group: "Bot" },
+  { key: "programmation", label: "Lancer le bot", icon: "◷", group: "Bot" },
   { key: "reglages", label: "Connexions & coûts", icon: "⚙", group: "Bot" },
 ];
 
 // Anciens liens (?tab=pending…) toujours valables.
 const LEGACY: Record<string, View> = { pending: "valider", approved: "poster", posted: "stats" };
 
-type Search = { v?: string; tab?: string; launch?: string; prog?: string; yt?: string; scope?: string; net?: string };
+type Search = { sent?: string; v?: string; tab?: string; launch?: string; prog?: string; yt?: string; scope?: string; net?: string };
 
 export default async function Home({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
   const want = sp.v ?? (sp.tab ? LEGACY[sp.tab] : undefined) ?? (sp.launch || sp.prog ? "programmation" : "accueil");
   const view = (NAV.find((n) => n.key === want)?.key ?? "accueil") as View;
 
-  const [{ last }, { clips, bytes }, { schedule, lastRun }, stats] = await Promise.all([
-    loadHeartbeat(), loadClipsAndSize(), loadSchedule(), loadStats(),
+  const [{ last }, { clips, bytes }, { schedule, lastRun }, stats, run] = await Promise.all([
+    loadHeartbeat(), loadClipsAndSize(), loadSchedule(), loadStats(), latestRun(),
   ]);
+  const sent = /^\d{13}$/.test(sp.sent ?? "") ? Number(sp.sent) : undefined;
   const state = botState(last);
   const ctx: Ctx = {
     clips, bytes, last, state, schedule, lastRun, stats,
@@ -83,6 +85,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       </aside>
 
       <main className="main">
+        <LiveBar key={sent ?? 0} initial={{ run, beat: last, now: new Date().toISOString() }} sent={sent} full={view === "bot"} />
         {!ctx.configured && <p className="banner">Stockage non configuré : la variable BLOB_READ_WRITE_TOKEN manque sur Vercel.</p>}
         {view === "accueil" && <Overview ctx={ctx} />}
         {view === "valider" && <ClipsView ctx={ctx} status="pending" />}
@@ -91,7 +94,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
         {view === "bot" && <BotView ctx={ctx} />}
         {view === "programmation" && <ProgView ctx={ctx} launch={sp.launch} prog={sp.prog} yt={sp.yt} />}
         {view === "reglages" && <SettingsView ctx={ctx} />}
-        {state.key === "running" && ["accueil", "bot", "valider"].includes(view) && <AutoRefresh seconds={15} />}
       </main>
     </div>
   );

@@ -45,5 +45,5 @@ export async function POST(req: Request) {
     console.error("dispatch", r.status, await r.text());
     return back(`error${r.status}`);
   }
-  return back("ok");
+  return NextResponse.redirect(new URL(`/?v=bot&sent=${Date.now()}`, req.url), 303);
 }

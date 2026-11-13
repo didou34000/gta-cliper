@@ -4,6 +4,7 @@
 //  heartbeat/<ms>.json      : statut du bot à chaque étape (jamais écrasé)
 // On n'écrase jamais un fichier : le cache CDN de Blob ne peut donc pas servir une vieille version.
 import { del, list, put } from "@vercel/blob";
+import { DEMO_BEAT, DEMO_CLIPS, demoOn } from "./demo";
 
 export type Status = "pending" | "approved" | "rejected" | "posted";
 
@@ -102,6 +103,7 @@ async function getJson<T>(url: string, immutable = true): Promise<T | null> {
 }
 
 export async function loadHeartbeat(): Promise<{ last: Heartbeat | null; history: Heartbeat[] }> {
+  if (demoOn()) return { last: DEMO_BEAT, history: [DEMO_BEAT] };
   if (!hasStore()) return { last: null, history: [] };
   const blobs = (await listAll("heartbeat/")).sort((a, b) => b.pathname.localeCompare(a.pathname));
   // Ménage : on garde les 60 derniers battements.
@@ -118,6 +120,7 @@ export async function loadClips(): Promise<Clip[]> {
 
 /** Clips + place occupée par les vidéos/miniatures dans Blob (en octets), avec les mêmes appels list. */
 export async function loadClipsAndSize(): Promise<{ clips: Clip[]; bytes: number }> {
+  if (demoOn()) return { clips: DEMO_CLIPS, bytes: 210e6 };
   if (!hasStore()) return { clips: [], bytes: 0 };
   const [clipBlobs, decisionBlobs] = await Promise.all([listAll("clips/"), listAll("decisions/")]);
   const bytes = clipBlobs.reduce((n, b) => n + (b.size ?? 0), 0);
