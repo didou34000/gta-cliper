@@ -26,8 +26,8 @@ from pydantic import BaseModel, Field
 
 log = logging.getLogger("gta_clipper")
 
-YT_RE = re.compile(r"^https?://(www\.|m\.|music\.)?(youtube\.com/(watch\?|shorts/|live/)|youtu\.be/)",
-                   re.I)
+YT_RE = re.compile(r"^https?://(www\.|m\.|music\.)?(youtube\.com/(watch\?.*v=[\w-]{6,}|shorts/[\w-]{6,}|"
+                   r"live/[\w-]{6,})|youtu\.be/[\w-]{6,})", re.I)
 
 
 def is_youtube(url: str) -> bool:
@@ -229,10 +229,23 @@ def pick_moments(segs: list[Seg], peaks: list[Peak], n: int, *, title: str = "",
                 return out[:n]
         except Exception as e:
             log.warning("Choix des moments par l'IA impossible : %s", e)
-    # Repli gratuit : autour des plus gros pics de volume (le pic arrive souvent en fin d'action).
-    best = sorted(peaks, key=lambda p: -p.z)
+    return fallback_moments(segs, peaks, n, duration)
+
+
+def fallback_moments(segs: list[Seg], peaks: list[Peak], n: int, duration: float) -> list[dict]:
+    """Repli gratuit (sans IA) : autour des plus gros pics de volume (le pic arrive souvent en
+    fin d'action), puis, s'il en manque, les passages où l'on parle le plus."""
     raw = [{"start": p.t - 25, "end": p.t + 15, "score": 0, "sujet": "",
-            "raison": f"pic de volume (force {p.z})"} for p in best]
+            "raison": f"pic de volume (force {p.z})"} for p in sorted(peaks, key=lambda p: -p.z)]
+    if duration > 0:
+        win, dens = 40.0, []
+        for k in range(int(max(1, duration // 20))):
+            a = k * 20.0
+            words = sum(len(g.text.split()) for g in segs if a <= g.start < a + win)
+            dens.append((words, a))
+        raw += [{"start": a, "end": a + win, "score": 0, "sujet": "",
+                 "raison": f"passage très parlé ({w} mots en 40 s)"}
+                for w, a in sorted(dens, reverse=True) if w > 0]
     return _clean(raw, segs, duration)[:n]
 
 

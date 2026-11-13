@@ -564,7 +564,11 @@ def run_youtube(cfg: dict, url: str, n: int = 3, streamer: str = "",
     work = Path(cfg["paths"]["work"])
     produced: list[Path] = []
     try:
+        if not youtube.is_youtube(url):
+            raise RuntimeError(f"Ce lien n'est pas une vidéo YouTube : {url[:120]}")
         info = youtube.video_info(url)
+        if not info["id"] or info["duration"] <= 0:
+            raise RuntimeError("Vidéo introuvable (lien incomplet, vidéo privée ou supprimée)")
         if info["is_live"]:
             raise RuntimeError("C'est un live en cours : attends qu'il soit terminé.")
         name = streamer.strip() or info["channel"] or "Le streamer"
@@ -598,13 +602,11 @@ def run_youtube(cfg: dict, url: str, n: int = 3, streamer: str = "",
         model = cfg.get("llm", {}).get("moments_model", "claude-haiku-5-5")
         rep.event(f"Claude ({model}) lit la transcription et choisit les {n} meilleurs moments"
                   if not skip_llm and os.environ.get("ANTHROPIC_API_KEY")
-                  else "Sans IA : choix sur les pics de volume", node="scoring", force=True)
-        moments = youtube.pick_moments(segs, peaks, n, title=info["title"],
-                                       channel=info["channel"], game=game, model=model,
-                                       duration=dur) if not skip_llm else \
-            youtube._clean([{"start": p.t - 25, "end": p.t + 15, "score": 0, "sujet": "",
-                             "raison": f"pic de volume (force {p.z})"}
-                            for p in sorted(peaks, key=lambda p: -p.z)], segs, dur)[:n]
+                  else "Sans IA : choix sur les pics de volume et les passages les plus parlés", node="scoring", force=True)
+        moments = (youtube.pick_moments(segs, peaks, n, title=info["title"],
+                                        channel=info["channel"], game=game, model=model,
+                                        duration=dur) if not skip_llm
+                   else youtube.fallback_moments(segs, peaks, n, dur))
         if not moments:
             rep.event("Aucun moment exploitable trouvé dans cette vidéo", node="scoring",
                       level="warn", force=True)
