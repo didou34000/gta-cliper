@@ -628,12 +628,11 @@ def run_youtube(cfg: dict, url: str, n: int = 3, streamer: str = "",
             if sid in already or slug(sid) in already:
                 rep.event(f"Déjà fait, ignoré : {label}", node="scoring")
                 continue
-            ctx = f"Moment choisi dans « {info['title']} » : {m.get('sujet') or ''}".strip(" :")
             _make_clip(cfg, rep, produced, already, sid=sid, name=name, label=label,
                        video_fn=lambda m=m, sid=sid: media.download(
                            url, work / sid / "source.mp4", m["start"], m["end"],
                            max_mb=Guard.get().limits["max_download_mb"]),
-                       twitch_title=ctx[:200],
+                       twitch_title=(m.get("sujet") or "")[:80],
                        source_url=f"https://youtu.be/{info['id']}?t={int(m['start'])}",
                        skip_llm=skip_llm,
                        extra={"kind": "youtube", "rank": k, "potential": m["score"] or None,
