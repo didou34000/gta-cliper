@@ -70,7 +70,7 @@ def main() -> None:
         if a.jeu:
             apply_launch_overrides(cfg, {"GAME_NAME": a.jeu})
         out = run_youtube(cfg, a.url, a.clips, a.streamer, skip_llm=a.no_llm)
-        print(f"{len(out)} clip(s) prêts" + (" (et envoyés sur le site)." if out and __import__("os").environ.get("BLOB_READ_WRITE_TOKEN") else "."))
+        print(f"{len(out)} clip(s) prêts" + (" (et envoyés sur le site)." if out and __import__("gta_clipper.remote", fromlist=["enabled"]).enabled() else "."))
         for d in out:
             print(" -", d / "clip.mp4")
     elif a.cmd == "run":
@@ -109,11 +109,11 @@ def main() -> None:
             upload_clip(d)
             print(f"Prêt à valider (en local et sur le site) : {d}")
         else:
-            print(f"Prêt à valider (en local uniquement, BLOB_READ_WRITE_TOKEN absent) : {d}")
+            print(f"Prêt à valider (en local uniquement, clés R2 absentes) : {d}")
     elif a.cmd == "site-test":
         from .remote import Reporter, enabled, upload_clip
         if not enabled():
-            raise SystemExit("BLOB_READ_WRITE_TOKEN absent : récupère-le dans Vercel > Storage.")
+            raise SystemExit("Clés R2 absentes : ajoute R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY et R2_PUBLIC_URL dans .env.")
         rep = Reporter()
         rep.beat("idle", "Test de liaison", "Le bot arrive à parler au site")
         items = sorted(Path(cfg["paths"]["review"]).glob("*/meta.json"))

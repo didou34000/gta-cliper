@@ -1,9 +1,8 @@
-// Lecture/écriture des données dans Vercel Blob.
+// Lecture/écriture des données dans Cloudflare R2 (lib/r2.ts).
 //  clips/<id>/meta-*.json, clip-*.mp4, thumb-*.jpg : écrits une fois par le bot
-//  decisions/<id>/<ms>.json : chaque action faite sur le site (jamais écrasé)
-//  heartbeat/<ms>.json      : statut du bot à chaque étape (jamais écrasé)
-// On n'écrase jamais un fichier : le cache CDN de Blob ne peut donc pas servir une vieille version.
-import { del, list, put } from "@vercel/blob";
+//  decisions/<id>/<ms>-*.json : chaque action faite sur le site (jamais écrasé)
+//  status/live.json         : statut du bot (un seul fichier réécrit, lu sans listage)
+import { deleteObjects, getJsonKey, listAll, publicUrl, putObject, r2Configured } from "./r2";
 import { DEMO_BEAT, DEMO_CLIPS, demoOn } from "./demo";
 
 export type Status = "pending" | "approved" | "rejected" | "posted";
@@ -80,45 +79,31 @@ export type Decision = {
   at: string;
 };
 
-const hasStore = () => !!process.env.BLOB_READ_WRITE_TOKEN;
+const hasStore = r2Configured;
 
-async function listAll(prefix: string) {
-  const out = [];
-  let cursor: string | undefined;
-  do {
-    const r = await list({ prefix, cursor, limit: 1000 });
-    out.push(...r.blobs);
-    cursor = r.hasMore ? r.cursor : undefined;
-  } while (cursor);
-  return out;
-}
-
+// Fichiers à nom unique (jamais réécrits) : lus par l'URL publique, gardés en cache 24 h par
+// Vercel (donc presque aucune lecture R2). Si l'accès public répond mal, lecture signée.
 async function getJson<T>(url: string, immutable = true): Promise<T | null> {
   try {
     const r = await fetch(url, immutable ? { next: { revalidate: 86400 } } : { cache: "no-store" });
-    return r.ok ? ((await r.json()) as T) : null;
-  } catch {
-    return null;
-  }
+    if (r.ok) return (await r.json()) as T;
+  } catch {}
+  const base = publicUrl() + "/";
+  return url.startsWith(base) ? getJsonKey<T>(url.slice(base.length)) : null;
 }
 
 export async function loadHeartbeat(): Promise<{ last: Heartbeat | null; history: Heartbeat[] }> {
   if (demoOn()) return { last: DEMO_BEAT, history: [DEMO_BEAT] };
   if (!hasStore()) return { last: null, history: [] };
-  const blobs = (await listAll("heartbeat/")).sort((a, b) => b.pathname.localeCompare(a.pathname));
-  // Ménage : on garde les 60 derniers battements.
-  const old = blobs.slice(60).map((b) => b.url);
-  if (old.length) del(old).catch(() => {});
-  const recent = await Promise.all(blobs.slice(0, 1).map((b) => getJson<Heartbeat>(b.url)));
-  const history = recent.filter(Boolean) as Heartbeat[];
-  return { last: history[0] ?? null, history };
+  const last = await getJsonKey<Heartbeat>("status/live.json");
+  return { last, history: last ? [last] : [] };
 }
 
 export async function loadClips(): Promise<Clip[]> {
   return (await loadClipsAndSize()).clips;
 }
 
-/** Clips + place occupée par les vidéos/miniatures dans Blob (en octets), avec les mêmes appels list. */
+/** Clips + place occupée par les vidéos/miniatures dans R2 (en octets), avec les mêmes appels list. */
 export async function loadClipsAndSize(): Promise<{ clips: Clip[]; bytes: number }> {
   if (demoOn()) return { clips: DEMO_CLIPS, bytes: 210e6 };
   if (!hasStore()) return { clips: [], bytes: 0 };
@@ -173,25 +158,15 @@ export async function loadClipsAndSize(): Promise<{ clips: Clip[]; bytes: number
  *  Un repère seen/<id>.json est gardé pour que le bot ne le refasse jamais. */
 export async function deleteClip(id: string) {
   if (!/^[\w.-]+$/.test(id)) throw new Error("id invalide");
-  await put(`seen/${id}.json`, "{}", {
-    access: "public", contentType: "application/json", addRandomSuffix: false, allowOverwrite: true,
-  });
-  const urls: string[] = [];
-  for (const prefix of [`clips/${id}/`, `decisions/${id}/`]) {
-    let cursor: string | undefined;
-    do {
-      const r = await list({ prefix, cursor, limit: 1000 });
-      urls.push(...r.blobs.map((b) => b.url));
-      cursor = r.hasMore ? r.cursor : undefined;
-    } while (cursor);
-  }
-  if (urls.length) await del(urls);
+  await putObject(`seen/${id}.json`, "{}");
+  // Pas de listage : on reprend la liste déjà en cache (clips/ et decisions/ entiers).
+  const [c, d] = await Promise.all([listAll("clips/"), listAll("decisions/")]);
+  const urls = [...c, ...d].filter((b) => b.pathname.startsWith(`clips/${id}/`) || b.pathname.startsWith(`decisions/${id}/`)).map((b) => b.url);
+  if (urls.length) await deleteObjects(urls);
 }
 
 export async function saveDecision(id: string, d: Omit<Decision, "at">) {
   if (!/^[\w.-]+$/.test(id)) throw new Error("id invalide");
   const at = new Date().toISOString();
-  await put(`decisions/${id}/${Date.now()}.json`, JSON.stringify({ ...d, at }), {
-    access: "public", contentType: "application/json", addRandomSuffix: true,
-  });
+  await putObject(`decisions/${id}/${Date.now()}.json`, JSON.stringify({ ...d, at }), { suffix: true });
 }

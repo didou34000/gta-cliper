@@ -101,6 +101,8 @@ def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "
             messages=[{"role": "user", "content": content}],
             output_format=ClipMetadata,
         )
+        from . import usage
+        usage.llm(m, resp)
         if resp.stop_reason == "refusal":
             continue  # on retente sur le modèle de secours
         meta = resp.parsed_output

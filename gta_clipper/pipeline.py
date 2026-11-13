@@ -295,6 +295,8 @@ def _make_clip(cfg, rep, produced, already, *, sid, name, video_fn, label, **kw)
         produced.append(item)
         already.add(sid)
         guard.clip_done()
+        from . import usage
+        usage.clip_done()
         rep.stats["clips_produits"] += 1
         rep.add(name, "produits")
         from .remote import enabled, upload_clip
@@ -548,6 +550,7 @@ def run_youtube(cfg: dict, url: str, n: int = 3, streamer: str = "",
     from .remote import Reporter
     guard = Guard(cfg, Path(cfg["paths"]["work"]).parent / "usage.json")
     rep = Reporter()
+    rep.kind = "youtube"
     if guard.stopped():
         rep.beat("idle", "Arrêt d'urgence actif", "aucun passage")
         return []

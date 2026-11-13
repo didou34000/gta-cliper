@@ -223,6 +223,8 @@ def pick_moments(segs: list[Seg], peaks: list[Peak], n: int, *, title: str = "",
             resp = client.messages.parse(
                 model=model, max_tokens=4000, system=SYSTEM,
                 messages=[{"role": "user", "content": msg}], output_format=Moments)
+            from . import usage
+            usage.llm(model, resp)
             got = resp.parsed_output.moments if resp.parsed_output else []
             out = _clean([m.model_dump() for m in got], segs, duration)
             if out:

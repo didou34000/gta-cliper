@@ -60,10 +60,10 @@ export function Kpi({ label, value, hint, tone, href }: { label: string; value: 
   return href ? <a href={href} className={`${cls} kpi-link`}>{inner}</a> : <div className={cls}>{inner}</div>;
 }
 
-export function Panel({ title, action, children, className = "" }: { title?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
+export function Panel({ title, sub, action, children, className = "" }: { title?: ReactNode; sub?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <section className={`panel ${className}`}>
-      {(title || action) && <header className="panel-head">{title && <h2>{title}</h2>}{action}</header>}
+      {(title || action) && <header className="panel-head">{title && <h2>{title}{sub && <small className="panel-sub">{sub}</small>}</h2>}{action}</header>}
       {children}
     </section>
   );

@@ -1,32 +1,39 @@
-"""Envoi du statut du bot et des clips vers le site privé (stockage Vercel Blob).
+"""Envoi du statut du bot et des clips vers le site privé (stockage Cloudflare R2).
 
-Configuration : variable d'environnement BLOB_READ_WRITE_TOKEN (la même que celle du
-projet Vercel, visible dans Vercel > Storage > le store Blob > ".env.local").
-Sans cette variable, tout est ignoré et le bot fonctionne en local comme avant.
+Configuration (variables d'environnement, les mêmes que sur Vercel) :
+  R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL (https://pub-….r2.dev)
+  R2_BUCKET (facultatif, « gta-clipper » par défaut).
+Sans ces variables, tout est ignoré et le bot fonctionne en local comme avant.
 
-Les fichiers ne sont jamais écrasés (noms uniques), pour éviter le cache CDN de Blob.
+Les fichiers ne sont jamais écrasés (suffixe aléatoire), pour éviter les caches.
+Quota gratuit R2 : 10 Go, 1 million d'écritures/listages et 10 millions de lectures par mois.
 """
 from __future__ import annotations
 
 import json
 import logging
 import os
+import secrets
 import time
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlencode
 
 import requests
 
 log = logging.getLogger("gta_clipper")
 
-API = os.environ.get("VERCEL_BLOB_API_URL", "https://vercel.com/api/blob")
-API_VERSION = "12"  # version utilisée par @vercel/blob 2.8
+from . import s3lite
 
 
 def enabled() -> bool:
-    return bool(os.environ.get("BLOB_READ_WRITE_TOKEN"))
+    return s3lite.configured()
+
+
+def _suffixed(pathname: str) -> str:
+    stem, dot, ext = pathname.rpartition(".")
+    tag = secrets.token_hex(5)
+    return f"{stem}-{tag}.{ext}" if dot and "/" not in ext else f"{pathname}-{tag}"
 
 
 def put(pathname: str, data: bytes, content_type: str, random_suffix: bool = True,
@@ -34,52 +41,22 @@ def put(pathname: str, data: bytes, content_type: str, random_suffix: bool = Tru
     from .guard import Guard
     if not Guard.get().allow_upload(important):
         raise RuntimeError("Plafond quotidien d'envois vers le site atteint")
-    token = os.environ["BLOB_READ_WRITE_TOKEN"]
-    headers = {
-        "authorization": f"Bearer {token}",
-        "x-api-version": API_VERSION,
-        "x-vercel-blob-access": "public",
-        "x-content-type": content_type,
-        "x-add-random-suffix": "1" if random_suffix else "0",
-    }
-    url = f"{API}/?{urlencode({'pathname': pathname})}"
-    last_err = None
-    for attempt in range(4):
-        try:
-            r = requests.put(url, data=data, headers=headers, timeout=300)
-            if r.status_code < 300:
-                return r.json()
-            last_err = f"HTTP {r.status_code} : {r.text[:300]}"
-            if r.status_code < 500 and r.status_code != 429:
-                break
-        except requests.RequestException as e:
-            last_err = str(e)
-        time.sleep(2 ** attempt)
-    raise RuntimeError(f"Envoi vers Vercel Blob échoué ({pathname}) : {last_err}")
+    key = _suffixed(pathname) if random_suffix else pathname
+    try:
+        s3lite.put(key, data, content_type, "public, max-age=31536000, immutable"
+                   if random_suffix else "no-cache")
+    except Exception as e:
+        raise RuntimeError(f"Envoi vers le stockage R2 échoué ({pathname}) : {e}") from e
+    return {"pathname": key, "url": s3lite.public_url(key)}
 
 
 def _list(prefix: str) -> list[dict]:
-    out, cursor = [], None
-    for _ in range(20):
-        params = {"prefix": prefix, "limit": "1000", **({"cursor": cursor} if cursor else {})}
-        r = requests.get(f"{API}/?{urlencode(params)}", timeout=30, headers={
-            "authorization": f"Bearer {os.environ['BLOB_READ_WRITE_TOKEN']}",
-            "x-api-version": API_VERSION})
-        r.raise_for_status()
-        d = r.json()
-        out += d.get("blobs", [])
-        cursor = d.get("cursor") if d.get("hasMore") else None
-        if not cursor:
-            break
-    return out
+    return s3lite.list_objects(prefix)
 
 
 def _delete(urls: list[str]) -> None:
-    for i in range(0, len(urls), 100):
-        r = requests.post(f"{API}/delete", json={"urls": urls[i:i + 100]}, timeout=60, headers={
-            "authorization": f"Bearer {os.environ['BLOB_READ_WRITE_TOKEN']}",
-            "x-api-version": API_VERSION, "content-type": "application/json"})
-        r.raise_for_status()
+    base = s3lite.public_url() + "/"
+    s3lite.delete([u[len(base):] if u.startswith(base) else u for u in urls])
 
 
 # Ordre de suppression quand on dépasse le plafond : d'abord ce qui ne sert plus.
@@ -91,7 +68,7 @@ MB = 1024 * 1024
 
 def prune_site(max_clips: int = 0, keep: str = "", high_mb: int = 800, low_mb: int = 400,
                keep_heartbeats: int = 30) -> list[str]:
-    """Ménage du stockage Vercel (plafond gratuit 1 Go) :
+    """Ménage du stockage (on reste bien sous le quota gratuit) :
 
     - les clips rejetés partent toujours ;
     - les vieux statuts du bot (heartbeat/) au-delà des keep_heartbeats derniers partent ;
@@ -191,11 +168,11 @@ class Reporter:
 
     Chaque envoi contient tout l'état courant (40 derniers événements inclus), donc le
     site n'a besoin de lire que le dernier fichier. Les envois sont espacés d'au moins
-    MIN_INTERVAL secondes pour ne pas consommer le quota d'opérations de Vercel Blob ;
+    MIN_INTERVAL secondes pour ne pas consommer le quota d'opérations du stockage ;
     le début, la fin et les erreurs partent toujours tout de suite.
     """
 
-    MIN_INTERVAL = 20
+    MIN_INTERVAL = 30
 
     def __init__(self):
         self.on = enabled()
@@ -204,6 +181,8 @@ class Reporter:
         self.events: deque[dict] = deque(maxlen=40)
         self.status, self.node, self.step, self.message = "idle", "", "", ""
         self.current = ""
+        self.kind = "twitch"
+        self.usage: dict = {}
         self._last_push = 0.0
         self._dirty = False
         self.buffer = LogBuffer()
@@ -241,8 +220,12 @@ class Reporter:
 
     def beat(self, status: str, step: str = "", message: str = "", with_logs: bool = False,
              node: str = ""):
-        """Compatibilité : début/fin de passage, test de liaison."""
+        """Début/fin de passage, test de liaison. En fin de passage, le relevé de
+        consommation est enregistré et joint au statut."""
         self.status, self.step, self.message = status, step, message
+        if status in ("idle", "error") and "Arrêt d'urgence" not in step:
+            from . import usage
+            self.usage = usage.save_run(self.kind, "error" if status == "error" else "ok")
         if node:
             self.node = node
         self.events.appendleft({"ts": _now(), "streamer": self.current, "node": node,
@@ -258,16 +241,26 @@ class Reporter:
             return
         hb = {"ts": _now(), "status": self.status, "step": self.step, "message": self.message,
               "node": self.node, "streamer": self.current, "stats": dict(self.stats),
-              "streamers": self.streamers, "events": list(self.events)}
+              "streamers": self.streamers, "events": list(self.events), "kind": self.kind}
+        if self.usage:
+            hb["usage"] = self.usage
         if with_logs:
             hb["logs"] = list(self.buffer.lines)
         try:
-            put(f"heartbeat/{int(time.time() * 1000)}.json",
-                json.dumps(hb, ensure_ascii=False).encode(), "application/json",
-                important=force)
+            # Un seul fichier réécrit : le site le lit directement, sans listage.
+            put("status/live.json", json.dumps(hb, ensure_ascii=False).encode(),
+                "application/json", random_suffix=False, important=force)
             self._last_push, self._dirty = time.time(), False
         except Exception as e:  # le site ne doit jamais bloquer le bot
-            log.warning("Statut non envoyé au site : %s", e)
+            # On n'insiste pas à chaque ligne : prochain essai dans MIN_INTERVAL secondes,
+            # et plus du tout si le stockage est bloqué (quota dépassé, store suspendu).
+            self._last_push = time.time()
+            if any(w in str(e) for w in ("AccessDenied", "403", "InvalidAccessKeyId", "NoSuchBucket")):
+                self.on = False
+                log.error("Stockage du site bloqué (%s) : le bot continue mais le site ne sera "
+                          "plus mis à jour pendant ce passage.", e)
+            else:
+                log.warning("Statut non envoyé au site : %s", e)
 
 
 def _now() -> str:
@@ -281,10 +274,9 @@ def auto_approve_min() -> int:
     if env is not None and env.strip().isdigit():
         return int(env)
     try:
-        cfgs = sorted((b for b in _list("schedule/") if b["pathname"].startswith("schedule/config-")),
-                      key=lambda b: b["uploadedAt"])
-        if cfgs:
-            return int(requests.get(cfgs[-1]["url"], timeout=20).json().get("auto_min", 7))
+        raw = s3lite.get("schedule/config.json")  # 1 lecture, pas de listage
+        if raw:
+            return int(json.loads(raw).get("auto_min", 7))
     except Exception as e:
         log.warning("Seuil de validation auto illisible (%s) : validation manuelle", e)
         return 0

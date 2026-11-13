@@ -1,4 +1,4 @@
-// Suivi des lancements sur GitHub Actions (gratuit, ne consomme rien sur Vercel Blob).
+// Suivi des lancements sur GitHub Actions (gratuit, ne consomme rien sur le stockage).
 // Le jeton GH_DISPATCH_TOKEN (droit « Actions ») sert aussi à lire l'état des passages.
 import { REPO } from "./launch";
 import { demoOn, demoRun } from "./demo";
@@ -23,7 +23,7 @@ const WORKFLOWS: { file: string; kind: LiveRun["kind"]; main: string }[] = [
   { file: "youtube.yml", kind: "youtube", main: "Clips depuis le lien YouTube" },
 ];
 
-async function gh<T>(path: string): Promise<T | null> {
+export async function gh<T>(path: string): Promise<T | null> {
   const token = process.env.GH_DISPATCH_TOKEN;
   if (!token) return null;
   try {
