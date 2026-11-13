@@ -608,7 +608,8 @@ def run_youtube(cfg: dict, url: str, n: int = 3, streamer: str = "",
                                         duration=dur) if not skip_llm
                    else youtube.fallback_moments(segs, peaks, n, dur))
         if not moments:
-            rep.event("Aucun moment exploitable trouvé dans cette vidéo", node="scoring",
+            rep.event("Aucun moment exploitable trouvé dans cette vidéo"
+                      + (" (aucune parole détectée : musique seule ?)" if not segs else ""), node="scoring",
                       level="warn", force=True)
             return []
         rep.event("Moments retenus : " + " · ".join(
