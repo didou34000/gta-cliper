@@ -46,6 +46,7 @@ export type RunInfo = {
   max_clips?: number | null;
   min_views?: number;
   hours?: number;
+  source?: string;            // lien de la vidéo, pour un passage « lien YouTube »
 };
 
 export type Heartbeat = {

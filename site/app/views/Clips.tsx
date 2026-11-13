@@ -8,7 +8,7 @@ import { ago, dayTime, fmtHoursShort, fmtMin } from "@/lib/format";
 function runParams(r: RunInfo) {
   return [
     r.game,
-    r.top ? `top ${r.top} streamers` : "streamers choisis",
+    r.source ? "vidéo YouTube" : r.top ? `top ${r.top} streamers` : "streamers choisis",
     r.max_clips ? `${r.max_clips} clips max` : "",
     r.min_views != null ? `≥ ${r.min_views.toLocaleString("fr-FR")} vues` : "",
     r.hours ? `clips des ${fmtHoursShort(r.hours)}` : "",
@@ -37,6 +37,7 @@ function groupByRun(clips: Clip[]) {
 
 function scoreOf(c: Clip) {
   if (c.kind === "vod_chat_spike") return `pic de chat z = ${c.chat_zscore?.toFixed(1) ?? "?"}`;
+  if (c.kind === "youtube") return "vidéo YouTube";
   if (c.views != null) return `${c.views.toLocaleString("fr-FR")} vues Twitch`;
   return "manuel";
 }

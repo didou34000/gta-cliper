@@ -32,7 +32,7 @@ function GameSelect({ value }: { value?: string }) {
   );
 }
 
-export default async function ProgView({ ctx, launch, prog }: { ctx: Ctx; launch?: string; prog?: string }) {
+export default async function ProgView({ ctx, launch, prog, yt }: { ctx: Ctx; launch?: string; prog?: string; yt?: string }) {
   const { schedule, state, lastRun, nextRun } = ctx;
   const pubOn = bufferReady() && (await publishEnabled());
 
@@ -46,6 +46,14 @@ export default async function ProgView({ ctx, launch, prog }: { ctx: Ctx; launch
           {launch === "notoken" && <>Bouton pas encore branché : il manque le jeton GitHub GH_DISPATCH_TOKEN sur Vercel.</>}
           {launch === "nostreamer" && <>Choisis au moins un streamer.</>}
           {launch.startsWith("error") && <>GitHub a refusé le lancement (code {launch.slice(5)}). Le jeton est peut-être expiré ou sans le droit « Actions ».</>}
+        </p>
+      )}
+      {yt && (
+        <p className={`banner ${yt === "ok" ? "banner-ok" : ""}`}>
+          {yt === "ok" && <>Vidéo envoyée au bot. Il démarre dans 1 à 2 minutes ; compte 5 à 15 min pour 1 h de vidéo. Suis-le dans <a href="/?v=bot">Bot en direct</a>.</>}
+          {yt === "badurl" && <>Ce lien n&apos;est pas une vidéo YouTube (format attendu : youtube.com/watch?v=… ou youtu.be/…).</>}
+          {yt === "notoken" && <>Bouton pas encore branché : il manque le jeton GitHub GH_DISPATCH_TOKEN sur Vercel.</>}
+          {yt.startsWith("error") && <>GitHub a refusé le lancement (code {yt.slice(5)}).</>}
         </p>
       )}
       {prog === "ok" && <p className="banner banner-ok">Réglage enregistré. Il est pris en compte au prochain contrôle (toutes les 20 min).</p>}
@@ -65,6 +73,31 @@ export default async function ProgView({ ctx, launch, prog }: { ctx: Ctx; launch
               {pubOn ? "Couper la publication" : "Allumer la publication"}
             </button>
           )}
+        </form>
+      </Panel>
+
+      <Panel title="Clipper une vidéo YouTube">
+        <form method="post" action="/api/youtube" className="form-grid">
+          <fieldset className="wide">
+            <legend>Lien de la vidéo</legend>
+            <input name="url" type="url" required placeholder="https://www.youtube.com/watch?v=…" maxLength={300} />
+            <span className="muted small">Le bot écoute toute la vidéo, repère les meilleurs moments (transcription + pics de volume) et en fait des clips 9:16 sous-titrés, comme Opus Clip.</span>
+          </fieldset>
+          <fieldset>
+            <legend>Clips à sortir</legend>
+            <input type="number" name="clips" min={1} max={8} defaultValue={3} />
+          </fieldset>
+          <fieldset>
+            <legend>Jeu de la vidéo</legend>
+            <GameSelect />
+          </fieldset>
+          <fieldset>
+            <legend>Nom dans les titres</legend>
+            <input name="streamer" placeholder="vide = nom de la chaîne" maxLength={40} />
+          </fieldset>
+          <button type="submit" className="btn-primary" disabled={state.key === "running"}>
+            {state.key === "running" ? "Le bot est déjà occupé" : "Clipper"}
+          </button>
         </form>
       </Panel>
 
