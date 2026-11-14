@@ -12,13 +12,16 @@ import StatsView from "./views/Stats";
 import BotView from "./views/Bot";
 import ProgView from "./views/Programmation";
 import SettingsView from "./views/Settings";
+import LivesView from "./views/Lives";
+import { loadLives } from "@/lib/twitch";
 
 export const dynamic = "force-dynamic";
 
-type View = "accueil" | "valider" | "poster" | "stats" | "bot" | "programmation" | "reglages";
+type View = "accueil" | "lives" | "valider" | "poster" | "stats" | "bot" | "programmation" | "reglages";
 
 const NAV: { key: View; label: string; icon: string; group: string }[] = [
   { key: "accueil", label: "Vue d'ensemble", icon: "◎", group: "Pilotage" },
+  { key: "lives", label: "Lives GTA", icon: "▶", group: "Pilotage" },
   { key: "valider", label: "À valider", icon: "✓", group: "Clips" },
   { key: "poster", label: "À poster", icon: "↗", group: "Clips" },
   { key: "stats", label: "Publiés & stats", icon: "▮", group: "Clips" },
@@ -30,7 +33,7 @@ const NAV: { key: View; label: string; icon: string; group: string }[] = [
 // Anciens liens (?tab=pending…) toujours valables.
 const LEGACY: Record<string, View> = { pending: "valider", approved: "poster", posted: "stats" };
 
-type Search = { sent?: string; v?: string; tab?: string; launch?: string; prog?: string; yt?: string; scope?: string; net?: string };
+type Search = { sent?: string; v?: string; tab?: string; launch?: string; prog?: string; yt?: string; scope?: string; net?: string; jeu?: string; lang?: string; q?: string };
 
 export default async function Home({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
@@ -42,6 +45,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
     loadHeartbeat(), loadClipsAndSize(), loadSchedule(), loadStats(), latestRun(),
     view === "reglages" ? loadUsage() : Promise.resolve(null),
   ]);
+  const lang = /^[a-z]{2,5}$/.test(sp.lang ?? "") ? sp.lang : undefined;
+  const lives = view === "lives" ? await loadLives(lang) : null;
   await flushSiteOps().catch(() => {});
   const sent = /^\d{13}$/.test(sp.sent ?? "") ? Number(sp.sent) : undefined;
   const state = botState(last);
@@ -94,6 +99,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
         {ctx.configured && budget().blocked && <p className="banner">Plafond de sécurité atteint : la moitié du quota gratuit Cloudflare R2 est consommée ce mois-ci, le bot ne se lance plus et le site n&apos;écrit plus rien jusqu&apos;au 1er du mois. Rien ne sera facturé.</p>}
         {!ctx.configured && <p className="banner">Stockage non configuré : les clés R2 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL) manquent sur Vercel.</p>}
         {view === "accueil" && <Overview ctx={ctx} />}
+        {view === "lives" && lives && <LivesView ctx={ctx} lives={lives} jeu={sp.jeu} lang={lang} q={sp.q?.slice(0, 60)} />}
         {view === "valider" && <ClipsView ctx={ctx} status="pending" />}
         {view === "poster" && <ClipsView ctx={ctx} status="approved" />}
         {view === "stats" && <StatsView ctx={ctx} scope={sp.scope === "all" ? "all" : "bot"} net={sp.net} />}

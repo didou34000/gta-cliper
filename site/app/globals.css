@@ -376,3 +376,41 @@ input.title{font-weight:700;font-size:16px}
 .src{display:inline-block;font-family:var(--f-mono);font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:999px;margin-left:6px;vertical-align:1px}
 .src-mes{background:color-mix(in srgb,var(--ok, #22c55e) 16%,transparent);color:var(--ok, #22c55e)}
 .src-est{background:color-mix(in srgb,var(--warn, #f59e0b) 16%,transparent);color:var(--warn, #f59e0b)}
+
+/* Lives GTA (mini Twitch) */
+.lv-filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.lv-tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
+.lv-tabs a{padding:7px 14px;border-radius:7px;color:var(--muted);text-decoration:none;font-weight:600;font-size:14px}
+.lv-tabs a.on{background:var(--grad);color:#fff}
+.lv-search input{width:min(320px,100%);padding:9px 12px;border-radius:10px;border:1px solid var(--line2);background:var(--surface);color:var(--fg);font:inherit}
+.lv-search{flex:1;display:flex;justify-content:flex-end;min-width:200px}
+.lv-langs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.lv-langs a{flex:none;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap}
+.lv-langs a small{color:var(--dim);font-weight:500;margin-left:4px}
+.lv-langs a.on{border-color:var(--pink);background:rgba(255,62,165,.12);color:var(--pink)}
+.lv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:16px}
+.lv-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.lv-card:hover{border-color:var(--line2)}
+.lv-thumb{position:relative;display:block;aspect-ratio:16/9;background:#1b1030 center/cover no-repeat;background-color:#1b1030}
+.lv-thumb::after{content:"";position:absolute;inset:auto 0 0 0;height:45%;background:linear-gradient(transparent,rgba(0,0,0,.65))}
+.lv-thumb span{position:absolute;z-index:1;font-size:12px;font-weight:700;color:#fff;border-radius:5px;padding:2px 7px}
+.lv-live{top:8px;left:8px;background:#e91916}
+.lv-rank{top:8px;right:8px;background:rgba(0,0,0,.6)}
+.lv-viewers{bottom:8px;left:8px;background:rgba(0,0,0,.6)}
+.lv-viewers::first-letter{color:#ff4d4d}
+.lv-up{bottom:8px;right:8px;background:rgba(0,0,0,.6);font-weight:600!important}
+.lv-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.lv-name{margin:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.lv-name a{font-weight:750;color:var(--fg);text-decoration:none;font-size:15px}
+.lv-name a:hover{color:var(--pink)}
+.lv-lang,.lv-game{font-size:11px;font-weight:700;padding:2px 6px;border-radius:5px;background:var(--surface2);color:var(--muted)}
+.lv-game.vi{background:rgba(255,62,165,.14);color:var(--pink)}
+.lv-title{margin:0;color:var(--muted);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lv-clips{display:flex;flex-direction:column;gap:3px;margin-top:4px;padding-top:8px;border-top:1px solid var(--line)}
+.lv-clips-n{font-size:12.5px;font-weight:700;color:var(--violet)}
+.lv-clip{font-size:13px;color:var(--fg);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lv-clip::before{content:"▸ ";color:var(--dim)}
+.lv-clip:hover{color:var(--pink)}
+.lv-clip.st-posted::after{content:" · publié";color:var(--ok);font-size:12px}
+.lv-more{font-size:12.5px;color:var(--dim)}
+.lv-noclip{margin:4px 0 0;padding-top:8px;border-top:1px solid var(--line);font-size:12.5px;color:var(--dim)}
