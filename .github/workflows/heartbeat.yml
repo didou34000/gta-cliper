@@ -1,0 +1,60 @@
+# Le « moteur » du bot. Le cron de GitHub est trop peu fiable : sur ce dépôt il ne se
+# déclenchait qu'une fois toutes les 2 à 5 heures au lieu de toutes les 20 min.
+# Ce workflow reste allumé ~5 h 45 et, toutes les 10 min :
+#   1. regarde la Programmation du site (2 lectures R2) et lance un passage du bot si c'est l'heure ;
+#   2. toutes les 20 min, demande au site d'envoyer à Buffer les clips validés.
+# À la fin, il se relance lui-même. Le cron ci-dessous ne sert qu'à le redémarrer s'il s'arrête.
+# Dépôt public : minutes GitHub Actions gratuites et illimitées.
+name: Moteur (contrôle toutes les 10 min)
+on:
+  schedule:
+    - cron: "7 */2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write   # pour lancer « Bot GTA Clipper » et se relancer lui-même
+
+concurrency:
+  group: heartbeat
+  cancel-in-progress: false   # un seul moteur à la fois ; un relancement attend son tour
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Contrôles toutes les 10 min
+        run: |
+          end=$(( $(date +%s) + 340*60 ))
+          i=0
+          while [ "$(date +%s)" -lt "$end" ]; do
+            echo "── $(date -u +%H:%M) UTC"
+            if [ "${{ vars.STOP }}" = "1" ]; then echo "STOP=1 : rien n'est lancé"; else
+              out=$(mktemp)
+              GITHUB_OUTPUT="$out" timeout 90 python3 -m gta_clipper.schedule || true
+              if grep -q '^run=true' "$out"; then
+                v() { grep "^$1=" "$out" | head -1 | cut -d= -f2-; }
+                gh workflow run bot.yml --ref "${{ github.ref_name }}" \
+                  -f jeu="$(v jeu)" -f top_streamers="$(v top)" -f max_clips="$(v max_clips)" \
+                  -f min_views="$(v min_views)" -f heures="$(v heures)" \
+                  && echo "Passage du bot lancé" || echo "::warning::Lancement du bot impossible"
+              fi
+              if [ $((i % 2)) -eq 0 ]; then
+                curl -sS -m 60 -X POST https://gta-clipper.vercel.app/api/publish || true; echo
+              fi
+            fi
+            i=$((i+1))
+            sleep 600
+          done
+      - name: Se relancer
+        if: ${{ !cancelled() }}   # annuler le run à la main l'arrête (le cron le redémarre dans les 2 h)
+        run: gh workflow run heartbeat.yml --ref "${{ github.ref_name }}"
