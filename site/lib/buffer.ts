@@ -83,6 +83,11 @@ async function send(net: Net, c: Clip, due: Date): Promise<NetworkState> {
   }
 }
 
+// Garde-fou : le compte est GTA 6. Un clip validé qui ne parle pas de GTA (titre, description,
+// hashtags) n'est jamais envoyé : il reste dans « À poster » pour une décision à la main.
+const GTA_RE = /\bgta\b|gta ?(6|vi)\b|grand theft auto/i;
+export const isGtaClip = (c: Clip) => GTA_RE.test([c.title, c.description, ...(c.hashtags ?? [])].join(" "));
+
 const dues = (c: Clip) =>
   Object.values(c.networks ?? {}).filter((n) => n?.state === "scheduled" && n.due).map((n) => +new Date(n!.due!));
 
@@ -99,7 +104,7 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
   let last = allDues.length ? Math.max(...allDues) : 0;
 
   const todo = clips
-    .filter((c) => c.status === "approved" && c.video_url)
+    .filter((c) => c.status === "approved" && c.video_url && isGtaClip(c))
     .filter((c) => !Object.values(c.networks ?? {}).some((n) => n?.state === "error" && now - +new Date(n.at) < RETRY_AFTER_MS))
     .sort((a, b) => (a.decided_at ?? "").localeCompare(b.decided_at ?? ""));
 

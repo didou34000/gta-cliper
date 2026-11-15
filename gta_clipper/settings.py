@@ -47,7 +47,9 @@ def show_queue() -> None:
         st = _get(f"decisions/{cid}/{f}").get("status", "?")
         counts[st] = counts.get(st, 0) + 1
         if st == "approved":
-            meta = _get(f"clips/{cid}/meta.json")
+            keys = [o["pathname"] for o in s3lite.list_objects(f"clips/{cid}/")
+                    if o["pathname"].split("/")[-1].startswith("meta")]
+            meta = _get(keys[0]) if keys else {}
             print(f"  À poster : {cid} · {meta.get('title') or meta.get('titre') or '?'} "
                   f"· jeu={meta.get('game') or meta.get('jeu') or '?'}")
     print("Décisions (dernier état par clip) :", counts)
