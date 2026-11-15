@@ -36,7 +36,7 @@ let token: { value: string; exp: number } | null = null;
 let gameIds: { id: string; name: string }[] | null = null;
 const cache = new Map<string, { at: number; data: LivesResult }>();
 
-async function getToken(): Promise<string> {
+export async function getToken(): Promise<string> {
   if (token && Date.now() < token.exp) return token.value;
   const r = await fetch("https://id.twitch.tv/oauth2/token", {
     method: "POST",

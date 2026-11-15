@@ -14,5 +14,5 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   // /api/publish reste ouvert : GitHub l'appelle toutes les 20 min (il ne fait que remplir la file Buffer).
-  matcher: ["/((?!login|api/login|api/publish|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!login|api/login|api/publish|api/twitch-token|_next/static|_next/image|favicon.ico).*)"],
 };

@@ -8,7 +8,11 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import logging
+
 import requests
+
+log = logging.getLogger(__name__)
 
 HELIX = "https://api.twitch.tv/helix"
 TOKEN_URL = "https://id.twitch.tv/oauth2/token"
@@ -61,11 +65,33 @@ class TwitchClient:
                 "client_secret": self.client_secret,
                 "grant_type": "client_credentials",
             }, timeout=20)
-            r.raise_for_status()
-            d = r.json()
+            if r.status_code in (400, 401, 403):
+                d = self._token_from_site(r.status_code)
+            else:
+                r.raise_for_status()
+                d = r.json()
             self._token = d["access_token"]
             self._token_exp = time.time() + d.get("expires_in", 3600)
         return {"Client-Id": self.client_id, "Authorization": f"Bearer {self._token}"}
+
+    def _token_from_site(self, status: int) -> dict:
+        """Clé Twitch refusée (souvent : secret régénéré pour le site) → on emprunte le jeton
+        du site, en signant l'heure avec la clé R2 (partagée par le bot et le site)."""
+        import hashlib
+        import hmac
+        key = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+        site = os.environ.get("SITE_URL", "https://gta-clipper.vercel.app")
+        if not key:
+            raise RuntimeError(f"Twitch refuse TWITCH_CLIENT_SECRET (HTTP {status}) et pas de clé R2 "
+                               "pour emprunter le jeton du site")
+        ts = str(int(time.time()))
+        sig = hmac.new(key.encode(), f"twitch-token:{ts}".encode(), hashlib.sha256).hexdigest()
+        r = self.s.get(f"{site}/api/twitch-token", headers={"x-ts": ts, "x-sig": sig}, timeout=30)
+        if not r.ok:
+            raise RuntimeError(f"Twitch refuse TWITCH_CLIENT_SECRET (HTTP {status}) et le site "
+                               f"n'a pas pu prêter son jeton (HTTP {r.status_code} {r.text[:120]})")
+        log.warning("Clé Twitch du bot refusée (HTTP %s) : jeton emprunté au site", status)
+        return r.json()
 
     def _get(self, path: str, params: dict) -> dict:
         for attempt in range(4):
