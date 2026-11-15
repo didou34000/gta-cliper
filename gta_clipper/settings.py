@@ -35,6 +35,24 @@ def _flag(v: str) -> bool | None:
     return True if v in ON else False if v in OFF else None
 
 
+def show_queue() -> None:
+    """Affiche les clips dont la dernière décision est « approved » (ce que Buffer prendrait)."""
+    latest: dict[str, str] = {}
+    for o in s3lite.list_objects("decisions/"):
+        parts = o["pathname"].split("/")
+        if len(parts) == 3 and parts[2] > latest.get(parts[1], ""):
+            latest[parts[1]] = parts[2]
+    counts: dict[str, int] = {}
+    for cid, f in sorted(latest.items()):
+        st = _get(f"decisions/{cid}/{f}").get("status", "?")
+        counts[st] = counts.get(st, 0) + 1
+        if st == "approved":
+            meta = _get(f"clips/{cid}/meta.json")
+            print(f"  À poster : {cid} · {meta.get('title') or meta.get('titre') or '?'} "
+                  f"· jeu={meta.get('game') or meta.get('jeu') or '?'}")
+    print("Décisions (dernier état par clip) :", counts)
+
+
 def main() -> int:
     if not s3lite.configured():
         print("::error::Clés R2 manquantes")
@@ -45,6 +63,9 @@ def main() -> int:
     last = _get("schedule/last-run.json")
     print("Avant :", json.dumps({"programmation": cfg, "publication": pub, "dernier_passage": last},
                                 ensure_ascii=False))
+
+    if os.environ.get("SHOW_QUEUE", "1") != "0":
+        show_queue()
 
     new = dict(cfg)
     prog = _flag(os.environ.get("SET_PROGRAMMATION", ""))
