@@ -55,12 +55,50 @@ def mark_run(now: datetime) -> None:
                "application/json")
 
 
+PARIS = None
+
+
+def _paris(now: datetime) -> datetime:
+    global PARIS
+    if PARIS is None:
+        from zoneinfo import ZoneInfo
+        PARIS = ZoneInfo("Europe/Paris")
+    return now.astimezone(PARIS)
+
+
+def in_window(h: float, start: int, end: int) -> bool:
+    """h dans [start, end) ; une plage 22 → 3 passe minuit ; 0 → 24 = toute la journée."""
+    if start == end or (start == 0 and end == 24):
+        return True
+    return start <= h < end if start < end else (h >= start or h < end)
+
+
+def allowed(now: datetime, days, start: int, end: int) -> bool:
+    p = _paris(now)
+    h = p.hour + p.minute / 60
+    day = (p.weekday() + 1) % 7  # 0 = dimanche, comme sur le site
+    if start > end and h < end:  # après minuit dans une plage de nuit : c'est encore la veille
+        day = (day + 6) % 7
+    return in_window(h, start, end) and day in (days or range(7))
+
+
+def every_at(cfg: dict, now: datetime) -> int:
+    p = _paris(now)
+    peak = int(cfg.get("peak_every_min") or 0)
+    if peak and in_window(p.hour + p.minute / 60, int(cfg.get("peak_from", 18)), int(cfg.get("peak_to", 24))):
+        return max(20, peak)
+    return max(20, int(cfg.get("every_min", 30)))
+
+
 def decide(cfg: dict | None, last: datetime | None, now: datetime) -> tuple[bool, str]:
     if not cfg or not cfg.get("enabled"):
         return False, "programmation arrêtée sur le site"
     if before_gta6(str(cfg.get("game") or "Grand Theft Auto VI"), now):
         return False, "en attente de la sortie de GTA VI (18/11 vers 11 h 30 heure de Paris)"
-    every = max(20, int(cfg.get("every_min", 30))) * 60
+    if not allowed(now, cfg.get("days"), int(cfg.get("run_from", 0)), int(cfg.get("run_to", 24))):
+        return False, (f"hors des horaires réglés ({int(cfg.get('run_from', 0))} h → "
+                       f"{int(cfg.get('run_to', 24))} h, jours choisis)")
+    every = every_at(cfg, now) * 60
     if last and (now - last).total_seconds() < every - TOLERANCE_S:
         wait = int((every - (now - last).total_seconds()) // 60) + 1
         return False, f"prochain passage dans ~{wait} min"

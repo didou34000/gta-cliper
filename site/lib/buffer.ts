@@ -6,7 +6,7 @@
 //    comptes Buffer visés ; un réseau sans identifiant est ignoré
 // Sans clé, rien ne part : les clips attendent dans « À poster » comme avant.
 import { loadClips, saveDecision, type Clip, type Networks, type NetworkState } from "./data";
-import { loadSchedule } from "./schedule";
+import { loadSchedule, nextAllowed, parisClock } from "./schedule";
 import { getJsonKey, putObject, r2Configured } from "./r2";
 
 const API = "https://api.buffer.com";
@@ -108,12 +108,30 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
     .filter((c) => !Object.values(c.networks ?? {}).some((n) => n?.state === "error" && now - +new Date(n.at) < RETRY_AFTER_MS))
     .sort((a, b) => (a.decided_at ?? "").localeCompare(b.decided_at ?? ""));
 
+  // Horaires de publication (Programmation) : jours, plage horaire, plafond par jour.
+  const nets = NETS.filter((n) => !schedule.nets?.length || schedule.nets.includes(n));
+  const perDay = new Map<string, number>(); // posts déjà prévus par jour (heure de Paris)
+  for (const c of clips) {
+    const d = dues(c);
+    if (d.length) { const k = parisClock(new Date(Math.min(...d))).date; perDay.set(k, (perDay.get(k) ?? 0) + 1); }
+  }
+  const slot = (from: number): Date => {
+    let t = nextAllowed(new Date(from), schedule.pub_days, schedule.pub_from, schedule.pub_to);
+    for (let i = 0; i < 14 && schedule.pub_max_day > 0 && (perDay.get(parisClock(t).date) ?? 0) >= schedule.pub_max_day; i++) {
+      // jour plein : on passe au lendemain (minuit de Paris), puis à la première heure autorisée
+      const c = parisClock(t);
+      t = nextAllowed(new Date(+t + (24 - c.hour) * 3600_000 + 60_000), schedule.pub_days, schedule.pub_from, schedule.pub_to);
+    }
+    return t;
+  };
+
   let sent = 0;
   for (const c of todo) {
     if (inFlight >= MAX_SCHEDULED) break;
-    const due = new Date(Math.max(now + FIRST_DELAY_MS, last + every));
+    const due = slot(Math.max(now + FIRST_DELAY_MS, last + every));
+    if (+due - now > 7 * 24 * 3600_000) break; // rien d'autorisé dans les 7 jours : on attend
     const networks: Networks = { ...(c.networks ?? {}) };
-    for (const net of NETS) {
+    for (const net of nets) {
       if (networks[net]?.state === "scheduled" || networks[net]?.state === "posted") continue;
       networks[net] = await send(net, c, due);
     }
@@ -122,7 +140,7 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
       status: anyOk ? "posted" : "approved",
       title: c.title, description: c.description, hashtags: c.hashtags, post_url: c.post_url, networks,
     });
-    if (anyOk) { sent++; inFlight++; last = +due; }
+    if (anyOk) { sent++; inFlight++; last = +due; const k = parisClock(due).date; perDay.set(k, (perDay.get(k) ?? 0) + 1); }
   }
   return { ok: true, sent, message: sent ? `${sent} clip(s) programmé(s) sur Buffer` : "Rien à envoyer" };
 }

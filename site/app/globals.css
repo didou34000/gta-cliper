@@ -258,6 +258,8 @@ input.title{font-weight:700;font-size:16px}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px;max-height:220px;overflow-y:auto}
 .checks label{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--fg);margin:0;cursor:pointer}
 .checks input,.toggle input{width:auto;accent-color:var(--pink)}
+.inline-check{display:inline-flex;align-items:center;gap:6px;margin:0 10px 0 6px;cursor:pointer}
+.inline-check input{width:auto;accent-color:var(--pink)}
 .toggle{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--fg);margin:0;cursor:pointer;padding:9px 0}
 
 /* ---------- Bot en direct ---------- */
