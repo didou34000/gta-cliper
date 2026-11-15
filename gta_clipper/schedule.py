@@ -18,7 +18,16 @@ from datetime import datetime, timezone
 
 from . import s3lite
 
-TOLERANCE_S = 120  # GitHub déclenche souvent avec une ou deux minutes de retard
+TOLERANCE_S = 120
+# Sortie de GTA VI : premiers joueurs (Nouvelle-Zélande) le 18/11 vers 11 h UTC. Avant, la
+# catégorie Twitch « Grand Theft Auto VI » ne contient que du GTA V / RP mal rangé : on ne
+# lance rien (sinon des clips titrés « sur GTA 6 » montreraient en fait GTA V).
+GTA6_RELEASE = datetime(2026, 11, 18, 10, 30, tzinfo=timezone.utc)
+
+
+def before_gta6(game: str, now: datetime) -> bool:
+    g = (game or "").lower()
+    return now < GTA6_RELEASE and ("theft auto vi" in g or "gta 6" in g or "gta vi" in g)  # GitHub déclenche souvent avec une ou deux minutes de retard
 
 
 def _get_json(key: str) -> dict | None:
@@ -49,6 +58,8 @@ def mark_run(now: datetime) -> None:
 def decide(cfg: dict | None, last: datetime | None, now: datetime) -> tuple[bool, str]:
     if not cfg or not cfg.get("enabled"):
         return False, "programmation arrêtée sur le site"
+    if before_gta6(str(cfg.get("game") or "Grand Theft Auto VI"), now):
+        return False, "en attente de la sortie de GTA VI (18/11 vers 11 h 30 heure de Paris)"
     every = max(20, int(cfg.get("every_min", 30))) * 60
     if last and (now - last).total_seconds() < every - TOLERANCE_S:
         wait = int((every - (now - last).total_seconds()) // 60) + 1

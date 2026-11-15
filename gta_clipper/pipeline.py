@@ -319,7 +319,7 @@ def _budget_stop(rep) -> None:
 _AUTO_MIN: int | None = None
 
 
-def _auto_approve(item, extra: dict, rep) -> bool:
+def _auto_approve(item, extra: dict, rep, cfg: dict | None = None) -> bool:
     """Si la note de potentiel atteint le seuil réglé sur le site, le clip est validé tout
     seul (la publication Buffer le prend ensuite). Jamais si le titre est marqué peu sûr."""
     global _AUTO_MIN
@@ -328,6 +328,13 @@ def _auto_approve(item, extra: dict, rep) -> bool:
         _AUTO_MIN = auto_approve_min()
     pot = extra.get("potential")
     if not _AUTO_MIN or not pot or pot < _AUTO_MIN:
+        return False
+    from datetime import datetime, timezone
+    from .schedule import before_gta6
+    if before_gta6(game_label(cfg or {}) or (cfg or {}).get("game_name", ""),
+                   datetime.now(timezone.utc)):
+        rep.event("Avant la sortie de GTA VI : pas de validation auto (la catégorie Twitch "
+                  "contient surtout du GTA V)", node="site")
         return False
     try:
         meta = json.loads((item / "meta.json").read_text(encoding="utf-8"))
@@ -375,7 +382,7 @@ def _make_clip(cfg, rep, produced, already, *, sid, name, video_fn, label, **kw)
             try:
                 upload_clip(item)
                 _prune(cfg, rep, keep=item.name)
-                if _auto_approve(item, kw.get("extra") or {}, rep):
+                if _auto_approve(item, kw.get("extra") or {}, rep, cfg):
                     rep.event(f"Validé automatiquement, part dans « À poster » : {label}",
                               node="site", force=True)
                 else:
