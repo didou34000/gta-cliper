@@ -27,6 +27,9 @@ on:
       heures:
         description: "Chercher les clips des N dernières heures (1 à 720)"
         default: "48"
+      langue:
+        description: "Langue des streamers : fr, en, es, de, pt, it, ja, ko, ou any (toutes). Hors fr : sous-titres traduits en français"
+        default: "fr"
 
 permissions:
   contents: read
@@ -42,6 +45,7 @@ jobs:
       max_clips: ${{ steps.plan.outputs.max_clips }}
       min_views: ${{ steps.plan.outputs.min_views }}
       heures: ${{ steps.plan.outputs.heures }}
+      langue: ${{ steps.plan.outputs.langue }}
     steps:
       - uses: actions/checkout@v4
         if: github.event_name == 'schedule'
@@ -57,11 +61,12 @@ jobs:
           IN_MAX: ${{ inputs.max_clips }}
           IN_MIN: ${{ inputs.min_views }}
           IN_HEURES: ${{ inputs.heures }}
+          IN_LANG: ${{ inputs.langue }}
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
             python3 -m gta_clipper.schedule
           else
-            { echo "run=true"; echo "jeu=$IN_JEU"; echo "top=${IN_TOP:-8}"; echo "max_clips=${IN_MAX:-3}"; echo "min_views=${IN_MIN:-200}"; echo "heures=${IN_HEURES:-48}"; } >> "$GITHUB_OUTPUT"
+            { echo "run=true"; echo "jeu=$IN_JEU"; echo "top=${IN_TOP:-8}"; echo "max_clips=${IN_MAX:-3}"; echo "min_views=${IN_MIN:-200}"; echo "heures=${IN_HEURES:-48}"; echo "langue=${IN_LANG:-fr}"; } >> "$GITHUB_OUTPUT"
           fi
 
   run:
@@ -88,6 +93,7 @@ jobs:
       MAX_CLIPS: ${{ needs.check.outputs.max_clips || '3' }}
       MIN_VIEWS: ${{ needs.check.outputs.min_views || '200' }}
       HOURS: ${{ needs.check.outputs.heures || '48' }}
+      STREAM_LANG: ${{ needs.check.outputs.langue || 'fr' }}
       WHISPER_DEVICE: cpu
       WHISPER_COMPUTE: int8
       FONTCONFIG_FILE: /etc/fonts/fonts.conf   # pour le ffmpeg statique

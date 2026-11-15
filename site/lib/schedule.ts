@@ -26,13 +26,14 @@ export type Schedule = {
   pub_to: number;             // … et pub_to h
   pub_max_day: number;        // posts max par jour et par réseau (0 = pas de limite)
   nets: string[];             // réseaux visés : tiktok, youtube
+  lang: string;               // langue des streamers (fr, en… ou any) ; hors fr, sous-titres traduits en français
   at?: string;
 };
 
 export const DEFAULT_SCHEDULE: Schedule = {
   enabled: false, every_min: 30, game: "Grand Theft Auto VI", top: 8, max_clips: 3, min_views: 200, hours: 48, publish_every_min: 120, auto_min: 7,
   days: [0, 1, 2, 3, 4, 5, 6], run_from: 0, run_to: 24, peak_from: 18, peak_to: 24, peak_every_min: 0,
-  pub_days: [0, 1, 2, 3, 4, 5, 6], pub_from: 8, pub_to: 24, pub_max_day: 0, nets: ["tiktok", "youtube"],
+  pub_days: [0, 1, 2, 3, 4, 5, 6], pub_from: 8, pub_to: 24, pub_max_day: 0, nets: ["tiktok", "youtube"], lang: "fr",
 };
 
 export const EVERY_OPTIONS = [20, 30, 45, 60, 90, 120, 180, 240, 360];
@@ -42,6 +43,17 @@ export const HOUR_OPTIONS = Array.from({ length: 25 }, (_, i) => i); // 0 … 24
 export const PUB_MAX_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
 export const DAY_NAMES = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
 export const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+export const LANG_OPTIONS = [
+  { id: "fr", label: "FR (français)" },
+  { id: "en", label: "anglophones (Nouvelle-Zélande, Australie, US, UK…)" },
+  { id: "es", label: "hispanophones" },
+  { id: "pt", label: "lusophones (Brésil…)" },
+  { id: "de", label: "germanophones" },
+  { id: "it", label: "italiens" },
+  { id: "ja", label: "japonais" },
+  { id: "ko", label: "coréens" },
+  { id: "any", label: "du monde entier (toutes langues)" },
+];
 export const NET_OPTIONS = [{ id: "tiktok", label: "TikTok" }, { id: "youtube", label: "YouTube Shorts" }];
 
 const TZ = "Europe/Paris";

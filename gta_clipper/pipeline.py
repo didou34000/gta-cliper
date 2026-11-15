@@ -35,7 +35,18 @@ def load_config(path: str | Path = "config.yaml") -> dict:
         cfg["min_clip_views"] = int(os.environ["MIN_VIEWS"])
     if (os.environ.get("HOURS") or "").isdigit():
         cfg["lookback_hours"] = max(1, min(720, int(os.environ["HOURS"])))
+    lang = (os.environ.get("STREAM_LANG") or cfg.get("stream_language") or "fr").strip().lower()
+    cfg["stream_language"] = lang if re.fullmatch(r"[a-z]{2}|any", lang) else "fr"
     return cfg
+
+
+LANG_NAMES = {"fr": "FR", "en": "anglophones", "es": "hispanophones", "pt": "lusophones",
+              "de": "germanophones", "it": "italiens", "ja": "japonais", "ko": "coréens",
+              "any": "du monde entier"}
+
+
+def lang_label(cfg: dict) -> str:
+    return LANG_NAMES.get(cfg.get("stream_language", "fr"), cfg.get("stream_language", "fr"))
 
 
 ALL_GAMES = {"", "tous", "tous les jeux", "all", "*", "off"}
@@ -174,12 +185,31 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
 
     duration = min(media.probe_duration(video), float(rc.get("max_duration", 60)))
 
+    spoken = "fr"
     if words is None:
         beat("transcription", f"Transcription Whisper de {duration:.0f} s de vidéo "
                               f"(modèle {wc['model']}, sur {wc['device']})")
+        want = cfg.get("stream_language", "fr")
         words = media.transcribe(video, wc["model"], wc["device"], wc["compute_type"],
-                                 streamer=streamer_name, game=game_label(cfg))
+                                 streamer=streamer_name, game=game_label(cfg),
+                                 language="fr" if want == "fr" else (None if want == "any" else want))
+        spoken = media.last_language or "fr"
     words = [w for w in words if w.start < duration]
+    if words and spoken != "fr":
+        import os as _os
+        if skip_llm or not _os.environ.get("ANTHROPIC_API_KEY"):
+            beat("transcription", f"Clip en « {spoken} » : pas de traduction sans clé Claude, "
+                                  "sous-titres dans la langue d'origine")
+        else:
+            beat("transcription", f"Clip en « {spoken} » : Claude traduit les {len(words)} mots "
+                                  "en sous-titres français")
+            try:
+                from .metadata import translate_words
+                words = translate_words(words, spoken, cfg["llm"]["model"])
+            except Exception as e:
+                log.warning("Traduction impossible : %s", e)
+                beat("transcription", f"Traduction impossible ({str(e)[:100]}) : sous-titres "
+                                      "dans la langue d'origine")
     beat("transcription", f"{len(words)} mots reconnus" if words
          else "Aucune parole détectée : clip sans sous-titres")
     media.save_words(words, item_dir / "transcript.json")
@@ -204,7 +234,7 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
             m = generate_metadata(streamer_name, text, twitch_title, cfg["llm"]["model"],
                                   cfg["llm"]["base_hashtags"] if game == "GTA 6" else [],
                                   words=words, game=game, frames=frames, frame_times=times,
-                                  duration=duration).model_dump()
+                                  duration=duration, origin=spoken).model_dump()
             cut = trim_window(m.pop("start_s", 0.0), m.pop("end_s", duration), duration, words,
                               min_len=float(rc.get("min_trim", 15)))
             fixes = apply_corrections(words, m.pop("corrections", []))
@@ -275,7 +305,7 @@ def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[
     if top_n <= 0:
         for st in cfg["streamers"]:
             rep.streamer(st["name"])
-    what = (f"les {top_n} plus gros streamers FR sur {cfg['game_name'] if cfg.get('game_filter', True) else 'tous les jeux'}"
+    what = (f"les {top_n} plus gros streamers {lang_label(cfg)} sur {cfg['game_name'] if cfg.get('game_filter', True) else 'tous les jeux'}"
             if top_n > 0 else f"{len(cfg['streamers'])} streamer(s) à vérifier")
     rep.beat("running", "Démarrage du passage", what, node="twitch")
     # Fiche du passage, recopiée dans chaque clip : le site range les clips par passage.
@@ -442,14 +472,15 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
     top_n = int(os.environ.get("TOP_STREAMERS") or cfg.get("top_streamers") or 0)
     if top_n > 0:
         game_label = cfg["game_name"] if game_id else "tous les jeux"
-        rep.event(f"Recherche des {top_n} plus gros streamers FR sur {game_label}", node="twitch",
+        rep.event(f"Recherche des {top_n} plus gros streamers {lang_label(cfg)} sur {game_label}", node="twitch",
                   force=True)
         top = tw.top_streamers(game_id, n=min(top_n, 20), hours=cfg["lookback_hours"],
+                               language=cfg.get("stream_language", "fr"),
                                known=[s["login"] for s in cfg.get("streamers", [])],
                                min_views=cfg["min_clip_views"])
         st = getattr(tw, "last_top_stats", {})
         if not top:
-            rep.event(f"Aucun streamer FR n'a de clip à {cfg['min_clip_views']} vues ou plus sur "
+            rep.event(f"Aucun streamer {lang_label(cfg)} n'a de clip à {cfg['min_clip_views']} vues ou plus sur "
                       f"{game_label} dans les {cfg['lookback_hours']} dernières heures "
                       f"({st.get('candidats', 0)} streamers vérifiés"
                       + (f" ; meilleur clip trouvé : {st['meilleur'][0]} vues chez {st['meilleur'][1]}"

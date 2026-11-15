@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AUTO_OPTIONS, EVERY_OPTIONS, HOURS_OPTIONS, HOUR_OPTIONS, NET_OPTIONS, PUBLISH_OPTIONS, PUB_MAX_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS, loadSchedule, saveSchedule, type Schedule } from "@/lib/schedule";
+import { AUTO_OPTIONS, EVERY_OPTIONS, HOURS_OPTIONS, HOUR_OPTIONS, LANG_OPTIONS, NET_OPTIONS, PUBLISH_OPTIONS, PUB_MAX_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS, loadSchedule, saveSchedule, type Schedule } from "@/lib/schedule";
 
 const pick = (v: FormDataEntryValue | null, allowed: number[], dflt: number) => {
   const n = parseInt(String(v ?? ""), 10);
@@ -28,6 +28,7 @@ export async function POST(req: Request) {
       max_clips: Math.min(10, Math.max(1, parseInt(String(f.get("max_clips") ?? cur.max_clips), 10) || cur.max_clips)),
       min_views: pick(f.get("min_views"), VIEWS_OPTIONS, cur.min_views),
       hours: pick(f.get("hours"), HOURS_OPTIONS, cur.hours),
+      lang: LANG_OPTIONS.some((o) => o.id === f.get("lang")) ? String(f.get("lang")) : cur.lang,
       days: days(f, "days"),
       run_from: pick(f.get("run_from"), HOUR_OPTIONS, cur.run_from),
       run_to: pick(f.get("run_to"), HOUR_OPTIONS, cur.run_to),
