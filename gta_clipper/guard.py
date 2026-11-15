@@ -98,8 +98,14 @@ class Guard:
         self.consecutive_errors += 1
 
     def allow_llm(self) -> bool:
+        """Refuse l'appel si le plafond du jour (nombre d'appels ou dépense) est atteint.
+        Le total du jour vient du registre R2 : il tient compte de tous les passages."""
+        from . import usage
         self._load_if_new_day()
-        if self.day["llm"] >= self.limits["max_llm_calls_per_day"]:
+        calls = max(self.day["llm"], usage.llm_calls_today())
+        if calls >= self.limits["max_llm_calls_per_day"]:
+            return False
+        if usage.llm_spent_today() >= usage.DAILY_LLM_USD:
             return False
         self._bump("llm")
         return True
@@ -117,4 +123,15 @@ class Guard:
         L = self.limits
         return (f"aujourd'hui : {self.day['clips']}/{L['max_new_clips_per_day']} clips, "
                 f"{self.day['llm']}/{L['max_llm_calls_per_day']} appels IA, "
+                f"{_spent():.3f}/{_cap():.2f} $ de Claude, "
                 f"{self.day['uploads']}/{L['max_site_uploads_per_day']} envois site")
+
+
+def _spent() -> float:
+    from . import usage
+    return usage.llm_spent_today()
+
+
+def _cap() -> float:
+    from . import usage
+    return usage.DAILY_LLM_USD

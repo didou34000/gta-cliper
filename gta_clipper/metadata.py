@@ -120,7 +120,7 @@ def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "
     meta = None
     for m in (model, FALLBACK_MODEL):
         if not Guard.get().allow_llm():
-            raise LimitReached("Plafond quotidien d'appels à l'IA atteint")
+            raise LimitReached("Plafond du jour atteint pour Claude (60 appels ou 1 $ ≈ 0,90 €)")
         resp = client.messages.parse(
             model=m,
             max_tokens=1500,
@@ -175,7 +175,7 @@ def translate_words(words: list, src_lang: str, model: str = "claude-haiku-5-5")
             g.append(w)
     src = [" ".join(w.text for w in g) for g in groups]
     if not Guard.get().allow_llm():
-        raise LimitReached("Plafond quotidien d'appels à l'IA atteint")
+        raise LimitReached("Plafond du jour atteint pour Claude (60 appels ou 1 $ ≈ 0,90 €)")
     client = anthropic.Anthropic(max_retries=2, timeout=90)
     resp = client.messages.parse(
         model=model, max_tokens=2000, system=TRANSLATE_SYSTEM,
