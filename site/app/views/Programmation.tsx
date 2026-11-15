@@ -1,7 +1,7 @@
 import { PageHead, Panel, type Ctx } from "../ctx";
 import { GAMES, REPO, STREAMERS } from "@/lib/launch";
 import { bufferReady, publishEnabled } from "@/lib/buffer";
-import { AUTO_OPTIONS, EVERY_OPTIONS, HOURS_OPTIONS, PUBLISH_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS } from "@/lib/schedule";
+import { AUTO_OPTIONS, DAY_NAMES, DAY_ORDER, EVERY_OPTIONS, HOURS_OPTIONS, HOUR_OPTIONS, NET_OPTIONS, PUBLISH_OPTIONS, PUB_MAX_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS } from "@/lib/schedule";
 import { ago, fmtMin, hhmm } from "@/lib/format";
 
 const VIEWS_HINT: Record<number, string> = { 200: " (conseillé)" };
@@ -35,6 +35,25 @@ function Count({ name, value, max }: { name: string; value: number; max: number 
     </select>
   );
 }
+function Hour({ name, value, label }: { name: string; value: number; label: string }) {
+  return (
+    <select name={name} defaultValue={String(value)} aria-label={label}>
+      {HOUR_OPTIONS.map((h) => <option key={h} value={h}>{h === 24 ? "minuit (24 h)" : `${h} h`}</option>)}
+    </select>
+  );
+}
+function Days({ name, value }: { name: string; value: number[] }) {
+  const on = new Set(value?.length ? value : [0, 1, 2, 3, 4, 5, 6]);
+  return (
+    <div className="checks days">
+      {DAY_ORDER.map((d) => (
+        <label key={d}><input type="checkbox" name={name} value={d} defaultChecked={on.has(d)} /> {DAY_NAMES[d]}</label>
+      ))}
+    </div>
+  );
+}
+const span = (a: number, b: number) => (a === b || (a === 0 && b === 24) ? "toute la journée" : `de ${a} h à ${b === 24 ? "minuit" : `${b} h`}${a > b ? " (passe minuit)" : ""}`);
+
 function Game({ value }: { value?: string }) {
   const known = !value || GAMES.includes(value);
   return (
@@ -136,6 +155,17 @@ export default async function ProgView({ ctx, launch, prog, yt }: { ctx: Ctx; la
             et monter les <Count name="max_clips" value={schedule.max_clips} max={10} /> meilleurs.
           </p>
           <details className="opts"><summary>Autre jeu</summary><OtherGame value={schedule.game} /></details>
+          <details className="opts" open>
+            <summary>Horaires : {span(schedule.run_from, schedule.run_to)}{schedule.peak_every_min ? `, plus souvent ${span(schedule.peak_from, schedule.peak_to)}` : ""}</summary>
+            <p className="sentence">Jours où le bot tourne :</p>
+            <Days name="days" value={schedule.days} />
+            <p className="sentence">Tourner seulement entre <Hour name="run_from" value={schedule.run_from} label="Début des passages" /> et <Hour name="run_to" value={schedule.run_to} label="Fin des passages" /> (heure de Paris).</p>
+            <p className="sentence">Heures de pointe : entre <Hour name="peak_from" value={schedule.peak_from} label="Début des heures de pointe" /> et <Hour name="peak_to" value={schedule.peak_to} label="Fin des heures de pointe" />, passer <select name="peak_every_min" defaultValue={String(schedule.peak_every_min)} aria-label="Fréquence aux heures de pointe">
+              <option value="0">comme d&apos;habitude</option>
+              {EVERY_OPTIONS.map((n) => <option key={n} value={n}>toutes les {fmtMin(n)}</option>)}
+            </select>.</p>
+            <p className="muted small">Les gros streamers FR sont surtout en live le soir : mets les heures de pointe sur 18 h → 2 h. Une plage comme « 22 h à 3 h » passe minuit. 0 h → minuit = toute la journée.</p>
+          </details>
           <div className="row">
             <label className="switch"><input type="checkbox" name="enabled" defaultChecked={schedule.enabled} /> <span>Allumer le mode automatique</span></label>
             <button type="submit" className="btn-primary">Enregistrer</button>
@@ -156,6 +186,18 @@ export default async function ProgView({ ctx, launch, prog, yt }: { ctx: Ctx; la
               {PUBLISH_OPTIONS.map((n) => <option key={n} value={n}>{fmtMin(n)}</option>)}
             </select>.
           </p>
+          <details className="opts" open>
+            <summary>Horaires de publication : {span(schedule.pub_from, schedule.pub_to)}{schedule.pub_max_day ? `, ${schedule.pub_max_day} posts max par jour` : ""}</summary>
+            <p className="sentence">Publier sur : {NET_OPTIONS.map((n) => (
+              <label key={n.id} className="inline-check"><input type="checkbox" name="nets" value={n.id} defaultChecked={(schedule.nets?.length ? schedule.nets : ["tiktok", "youtube"]).includes(n.id)} /> {n.label}</label>
+            ))}</p>
+            <p className="sentence">Jours de publication :</p>
+            <Days name="pub_days" value={schedule.pub_days} />
+            <p className="sentence">Publier seulement entre <Hour name="pub_from" value={schedule.pub_from} label="Début des publications" /> et <Hour name="pub_to" value={schedule.pub_to} label="Fin des publications" />, et au plus <select name="pub_max_day" defaultValue={String(schedule.pub_max_day)} aria-label="Posts max par jour">
+              {PUB_MAX_OPTIONS.map((n) => <option key={n} value={n}>{n ? `${n} post${n > 1 ? "s" : ""}` : "sans limite"}</option>)}
+            </select> par jour.</p>
+            <p className="muted small">Un clip validé hors de ces horaires attend le prochain créneau. Buffer gratuit : 10 posts programmés à la fois par réseau.</p>
+          </details>
           <p className="muted small">Un clip dont le titre est marqué « peu sûr » reste toujours en validation manuelle.</p>
           <div className="row"><button type="submit" className="btn-ghost">Enregistrer</button></div>
         </form>

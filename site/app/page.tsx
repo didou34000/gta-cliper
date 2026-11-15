@@ -1,7 +1,7 @@
 import LiveBar from "./LiveBar";
 import { latestRun } from "@/lib/github";
 import { loadClipsAndSize, loadHeartbeat } from "@/lib/data";
-import { loadSchedule } from "@/lib/schedule";
+import { loadSchedule, nextRunAt } from "@/lib/schedule";
 import { budget, countPage, flushSiteOps, r2Configured } from "@/lib/r2";
 import { loadUsage } from "@/lib/usage";
 import { loadStats } from "@/lib/stats";
@@ -58,9 +58,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       approved: clips.filter((c) => c.status === "approved").length,
       posted: clips.filter((c) => c.status === "posted").length,
     },
-    nextRun: schedule.enabled
-      ? (lastRun ? new Date(Math.max(Date.now(), +new Date(lastRun) + schedule.every_min * 60000)) : new Date())
-      : null,
+    nextRun: nextRunAt(schedule, lastRun),
   };
   const badge: Partial<Record<View, number>> = { valider: ctx.counts.pending, poster: ctx.counts.approved };
   const groups = [...new Set(NAV.map((n) => n.group))];
