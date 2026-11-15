@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       programmation: { description: "Programmation : on / off (vide = inchangé)", default: "" }
+      langue: { description: "Langue des streamers : fr, en, es, pt, de, it, ja, ko, any", default: "" }
       jeu: { description: "Jeu Twitch (ex. Grand Theft Auto VI, ou « tous »)", default: "" }
       every_min: { description: "Un passage toutes les N min (20 à 360)", default: "" }
       max_clips: { description: "Clips max par passage (1 à 10)", default: "" }
@@ -28,6 +29,7 @@ jobs:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
           SET_PROGRAMMATION: ${{ inputs.programmation }}
           SET_JEU: ${{ inputs.jeu }}
+          SET_LANGUE: ${{ inputs.langue }}
           SET_EVERY_MIN: ${{ inputs.every_min }}
           SET_MAX_CLIPS: ${{ inputs.max_clips }}
           SET_MIN_VIEWS: ${{ inputs.min_views }}

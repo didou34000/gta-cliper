@@ -1,7 +1,7 @@
 import { PageHead, Panel, type Ctx } from "../ctx";
 import { GAMES, REPO, STREAMERS } from "@/lib/launch";
 import { bufferReady, publishEnabled } from "@/lib/buffer";
-import { AUTO_OPTIONS, DAY_NAMES, DAY_ORDER, EVERY_OPTIONS, HOURS_OPTIONS, HOUR_OPTIONS, NET_OPTIONS, PUBLISH_OPTIONS, PUB_MAX_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS } from "@/lib/schedule";
+import { AUTO_OPTIONS, DAY_NAMES, DAY_ORDER, EVERY_OPTIONS, HOURS_OPTIONS, HOUR_OPTIONS, LANG_OPTIONS, NET_OPTIONS, PUBLISH_OPTIONS, PUB_MAX_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS } from "@/lib/schedule";
 import { ago, fmtMin, hhmm } from "@/lib/format";
 
 const VIEWS_HINT: Record<number, string> = { 200: " (conseillé)" }
@@ -36,6 +36,14 @@ function Count({ name, value, max }: { name: string; value: number; max: number 
     </select>
   );
 }
+function Lang({ value }: { value?: string }) {
+  return (
+    <select name="lang" defaultValue={value || "fr"} aria-label="Langue des streamers">
+      {LANG_OPTIONS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+    </select>
+  );
+}
+
 function Hour({ name, value, label }: { name: string; value: number; label: string }) {
   return (
     <select name={name} defaultValue={String(value)} aria-label={label}>
@@ -110,7 +118,7 @@ export default async function ProgView({ ctx, launch, prog, yt }: { ctx: Ctx; la
         <Panel title={<><span className="step-n">B</span> Les clips Twitch du moment</>} className="launch">
           <form method="post" action="/api/launch" className="stack">
             <p className="sentence">
-              Regarder les clips des <Top value={8} /> plus gros streamers FR sur <Game />,
+              Regarder les clips des <Top value={8} /> plus gros streamers <Lang /> sur <Game />,
               créés ces <Hours value={48} />, vus au moins <Views value={200} /> fois,
               et monter les <Count name="max_clips" value={3} max={10} /> meilleurs.
             </p>
@@ -151,11 +159,12 @@ export default async function ProgView({ ctx, launch, prog, yt }: { ctx: Ctx; la
           <p className="sentence">
             Toutes les <select name="every_min" defaultValue={String(schedule.every_min)} aria-label="Fréquence">
               {EVERY_OPTIONS.map((n) => <option key={n} value={n}>{fmtMin(n)}</option>)}
-            </select>, regarder les clips des <Top value={schedule.top} /> plus gros streamers FR sur <Game value={schedule.game} />,
+            </select>, regarder les clips des <Top value={schedule.top} /> plus gros streamers <Lang value={schedule.lang} /> sur <Game value={schedule.game} />,
             créés ces <Hours value={schedule.hours} />, vus au moins <Views value={schedule.min_views} /> fois,
             et monter les <Count name="max_clips" value={schedule.max_clips} max={10} /> meilleurs.
           </p>
           <details className="opts"><summary>Autre jeu</summary><OtherGame value={schedule.game} /></details>
+          <p className="muted small">Hors français, le bot traduit les paroles : sous-titres, titre et accroche en français. Le 18/11, mets « anglophones » pour avoir les premiers clips de Nouvelle-Zélande et d&apos;Australie avant la sortie en France.</p>
           <details className="opts" open>
             <summary>Horaires : {span(schedule.run_from, schedule.run_to)}{schedule.peak_every_min ? `, plus souvent ${span(schedule.peak_from, schedule.peak_to)}` : ""}</summary>
             <p className="sentence">Jours où le bot tourne :</p>

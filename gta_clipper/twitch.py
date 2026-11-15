@@ -130,7 +130,9 @@ class TwitchClient:
                   "ended_at": now.isoformat().replace("+00:00", "Z")}
         cand: dict[str, str] = {l.lower(): l for l in (known or [])}
         live: dict[str, int] = {}
-        params = {"language": language, "first": 100}
+        lang = (language or "fr").lower()
+        anyl = lang in ("any", "all", "toutes", "")
+        params = {"first": 100} if anyl else {"language": lang, "first": 100}
         if game_id:
             params["game_id"] = game_id
         for st in self._get("/streams", params).get("data", [])[:40]:
@@ -139,8 +141,10 @@ class TwitchClient:
         if game_id:
             # Les VOD FR du jeu de la semaine, triées par vues : ceux qui y ont vraiment joué,
             # même s'ils ne sont pas dans la liste ni en live en ce moment.
-            vp, cursor = {"game_id": game_id, "language": language, "period": "week",
+            vp, cursor = {"game_id": game_id, "period": "week",
                           "sort": "views", "type": "archive", "first": 100}, None
+            if not anyl:
+                vp["language"] = lang
             for _ in range(2):
                 if cursor:
                     vp["after"] = cursor
@@ -156,7 +160,7 @@ class TwitchClient:
                     cp["after"] = cursor
                 d = self._get("/clips", cp)
                 for c in d.get("data", []):
-                    if (c.get("language") or "").lower() == language:
+                    if anyl or (c.get("language") or "").lower() == lang:
                         cand.setdefault(c["broadcaster_name"].lower(), c["broadcaster_name"])
                 cursor = d.get("pagination", {}).get("cursor")
                 if not cursor:

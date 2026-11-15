@@ -73,6 +73,9 @@ def main() -> int:
     prog = _flag(os.environ.get("SET_PROGRAMMATION", ""))
     if prog is not None:
         new["enabled"] = prog
+    lang = os.environ.get("SET_LANGUE", "").strip().lower()
+    if lang in ("fr", "en", "es", "pt", "de", "it", "ja", "ko", "any"):
+        new["lang"] = lang
     game = os.environ.get("SET_JEU", "").strip()
     if game:
         new["game"] = game[:80]

@@ -82,7 +82,7 @@ def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "
                       base_hashtags: list[str] | None = None,
                       words: list | None = None, game: str = "",
                       frames: list | None = None, frame_times: list[float] | None = None,
-                      duration: float = 0.0) -> ClipMetadata:
+                      duration: float = 0.0, origin: str = "fr") -> ClipMetadata:
     from .guard import Guard, LimitReached
     client = anthropic.Anthropic(max_retries=2, timeout=90)
     if words:  # mots numérotés (corrections) avec un repère de temps toutes les ~5 s (découpe)
@@ -97,6 +97,9 @@ def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "
     user = (
         f"Streamer : {streamer_name}\n"
         f"Jeu : {game or '(non précisé)'}\n"
+        + (f"Streamer étranger : il parle « {origin} ». La transcription ci-dessous est déjà "
+           f"traduite en français. Le titre peut le dire (ex. « Un streamer anglais découvre… » "
+           f"ou avec son nom), sans inventer son pays.\n" if origin and origin != "fr" else "")
         + (f"Durée du clip : {duration:.0f} s\n" if duration else "") +
         f"Titre donné au clip sur Twitch par un viewer (peut être vide ou approximatif) : "
         f"{twitch_title or '(aucun)'}\n\n"
@@ -142,3 +145,60 @@ def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "
     meta.title = meta.title.strip().strip('"')[:100]
     meta.hook = meta.hook.strip().strip('"')[:60]
     return meta
+
+
+class Translation(BaseModel):
+    lines: list[str] = Field(description="Une traduction française par ligne, même nombre et même ordre")
+
+
+TRANSLATE_SYSTEM = """Tu traduis en français les paroles d'un streamer pour des sous-titres \
+de clip court. Chaque ligne numérotée est un bout de phrase prononcé d'un trait. Rends \
+exactement une ligne française par ligne reçue, dans le même ordre, courte et naturelle \
+(français parlé, tutoiement, pas de traduction mot à mot). Garde les noms propres et les \
+termes de jeu (GTA, Vice City, Lucia, Jason…). Pas de censure, pas de commentaire. \
+Si une ligne est un bruit ou intraduisible, renvoie-la telle quelle."""
+
+
+def translate_words(words: list, src_lang: str, model: str = "claude-haiku-5-5") -> list:
+    """Traduit des mots horodatés (Whisper) en français en gardant le rythme : les mots sont
+    regroupés en bouts de phrase, chaque bout est traduit, puis ses mots français sont
+    répartis sur la même durée (les sous-titres restent calés sur la voix)."""
+    from .guard import Guard, LimitReached
+    from .media import Word
+    groups: list[list] = []
+    for w in words:
+        g = groups[-1] if groups else None
+        if (g is None or w.start - g[-1].end > 0.7 or len(g) >= 10
+                or g[-1].text.rstrip()[-1:] in ".?!"):
+            groups.append([w])
+        else:
+            g.append(w)
+    src = [" ".join(w.text for w in g) for g in groups]
+    if not Guard.get().allow_llm():
+        raise LimitReached("Plafond quotidien d'appels à l'IA atteint")
+    client = anthropic.Anthropic(max_retries=2, timeout=90)
+    resp = client.messages.parse(
+        model=model, max_tokens=2000, system=TRANSLATE_SYSTEM,
+        output_config={"effort": "low"},
+        messages=[{"role": "user", "content": f"Langue d'origine : {src_lang}\n\n"
+                   + "\n".join(f"{i + 1}. {t}" for i, t in enumerate(src))}],
+        output_format=Translation,
+    )
+    from . import usage
+    usage.llm(model, resp)
+    lines = resp.parsed_output.lines if resp.parsed_output else []
+    if len(lines) != len(groups):
+        raise RuntimeError(f"traduction incomplète ({len(lines)} lignes pour {len(groups)})")
+    out: list = []
+    for g, fr in zip(groups, lines):
+        toks = [t for t in (fr or "").split() if t]
+        if not toks:
+            continue
+        t0, t1 = g[0].start, max(g[-1].end, g[0].start + 0.4)
+        total = sum(len(t) + 1 for t in toks)
+        cur = t0
+        for t in toks:
+            d = (t1 - t0) * (len(t) + 1) / total
+            out.append(Word(start=round(cur, 3), end=round(cur + d, 3), text=t))
+            cur += d
+    return out

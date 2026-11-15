@@ -64,6 +64,7 @@ class Word:
 
 
 _whisper_model = None
+last_language: str = ""  # langue parlée détectée au dernier appel de transcribe()
 
 # Vocabulaire donné à Whisper pour bien écrire les noms propres du jeu.
 GAME_PROMPTS = {
@@ -73,7 +74,8 @@ GAME_PROMPTS = {
 
 
 def transcribe(path: Path, model: str = "large-v3", device: str = "auto",
-               compute_type: str = "auto", streamer: str = "", game: str = "") -> list[Word]:
+               compute_type: str = "auto", streamer: str = "", game: str = "",
+               language: str | None = "fr") -> list[Word]:
     """Transcription FR avec horodatage au mot (nécessaire pour les sous-titres animés).
 
     Le texte d'amorce donne à Whisper le contexte et l'orthographe des noms propres
@@ -83,12 +85,19 @@ def transcribe(path: Path, model: str = "large-v3", device: str = "auto",
 
     if _whisper_model is None:
         _whisper_model = WhisperModel(model, device=device, compute_type=compute_type)
-    segments, _ = _whisper_model.transcribe(
-        load_audio(path), language="fr", word_timestamps=True, vad_filter=True,
-        condition_on_previous_text=False, beam_size=5,
-        initial_prompt=(f"Stream Twitch de {streamer} en français. " if streamer else "")
-        + (GAME_PROMPTS.get(game) or (f"Il joue à {game}." if game else "")),
+    global last_language
+    if language == "fr":
+        prompt = ((f"Stream Twitch de {streamer} en français. " if streamer else "")
+                  + (GAME_PROMPTS.get(game) or (f"Il joue à {game}." if game else "")))
+    else:  # autre langue (ou détection auto) : amorce neutre en anglais
+        prompt = ((f"Twitch stream by {streamer}. " if streamer else "")
+                  + (f"Playing {game}: Vice City, Leonida, Lucia, Jason." if game == "GTA 6"
+                     else (f"Playing {game}." if game else "")))
+    segments, info = _whisper_model.transcribe(
+        load_audio(path), language=language, word_timestamps=True, vad_filter=True,
+        condition_on_previous_text=False, beam_size=5, initial_prompt=prompt or None,
     )
+    last_language = (language or getattr(info, "language", "") or "fr").lower()
     words: list[Word] = []
     for seg in segments:
         for w in seg.words or []:

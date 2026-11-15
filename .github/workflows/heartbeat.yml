@@ -45,7 +45,7 @@ jobs:
                 v() { grep "^$1=" "$out" | head -1 | cut -d= -f2-; }
                 gh workflow run bot.yml --ref "${{ github.ref_name }}" \
                   -f jeu="$(v jeu)" -f top_streamers="$(v top)" -f max_clips="$(v max_clips)" \
-                  -f min_views="$(v min_views)" -f heures="$(v heures)" \
+                  -f min_views="$(v min_views)" -f heures="$(v heures)" -f langue="$(v langue)" \
                   && echo "Passage du bot lancé" || echo "::warning::Lancement du bot impossible"
               fi
               if [ $((i % 2)) -eq 0 ]; then
