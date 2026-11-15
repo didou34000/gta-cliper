@@ -88,7 +88,7 @@ export function nextRunAt(s: Schedule, lastRun: string | null): Date | null {
 }
 export const VIEWS_OPTIONS = [20, 50, 100, 200, 500, 1000, 5000];
 export const AUTO_OPTIONS = [0, 6, 7, 8, 9];
-export const HOURS_OPTIONS = [6, 12, 24, 48, 72, 100, 168, 200, 336, 720];
+export const HOURS_OPTIONS = [1, 2, 3, 4, 6, 8, 12, 18, 24, 36, 48, 72, 100, 168, 200, 336, 720];
 
 export async function loadSchedule(): Promise<{ schedule: Schedule; lastRun: string | null }> {
   if (!r2Configured()) return { schedule: DEFAULT_SCHEDULE, lastRun: null };

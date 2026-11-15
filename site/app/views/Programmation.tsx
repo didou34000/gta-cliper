@@ -4,8 +4,9 @@ import { bufferReady, publishEnabled } from "@/lib/buffer";
 import { AUTO_OPTIONS, DAY_NAMES, DAY_ORDER, EVERY_OPTIONS, HOURS_OPTIONS, HOUR_OPTIONS, NET_OPTIONS, PUBLISH_OPTIONS, PUB_MAX_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS } from "@/lib/schedule";
 import { ago, fmtMin, hhmm } from "@/lib/format";
 
-const VIEWS_HINT: Record<number, string> = { 200: " (conseillé)" };
-const hoursLabel = (h: number) => (h < 24 ? `${h} dernières heures` : h === 24 ? "dernières 24 h" : h % 24 === 0 ? `${h / 24} derniers jours` : `${h} dernières heures`);
+const VIEWS_HINT: Record<number, string> = { 200: " (conseillé)" }
+const HOURS_HINT: Record<number, string> = { 3: " (lives en cours)", 24: " (conseillé)" };
+const hoursLabel = (h: number) => (h === 1 ? "60 dernières minutes" : h < 24 ? `${h} dernières heures` : h === 24 ? "dernières 24 h" : h % 24 === 0 ? `${h / 24} derniers jours` : `${h} dernières heures`);
 
 function Views({ value }: { value: number }) {
   return (
@@ -17,7 +18,7 @@ function Views({ value }: { value: number }) {
 function Hours({ value }: { value: number }) {
   return (
     <select name="hours" defaultValue={String(value)} aria-label="Période">
-      {HOURS_OPTIONS.map((n) => <option key={n} value={n}>{hoursLabel(n)}</option>)}
+      {HOURS_OPTIONS.map((n) => <option key={n} value={n}>{hoursLabel(n)}{HOURS_HINT[n] ?? ""}</option>)}
     </select>
   );
 }
