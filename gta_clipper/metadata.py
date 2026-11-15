@@ -51,6 +51,21 @@ après la réaction ou la conclusion. Coupe ce qui traîne après (temps mort, �
 discussion sans rapport, nouvelle partie). Ne commence jamais au milieu d'une phrase. \
 Entre 15 et 60 secondes. Si le clip est déjà bien coupé, renvoie 0 et la durée totale.
 
+Note de clic (click_score, de 1 à 10) : sois EXIGEANT, c'est elle qui décide si le clip est \
+publié tout seul. Question : un inconnu qui scrolle TikTok s'arrête-t-il, regarde-t-il jusqu'au \
+bout, et a-t-il envie de partager ou commenter ? Juge sur les images et la transcription, pas \
+sur le titre Twitch.
+- 9-10 : moment exceptionnel et immédiatement lisible (réaction énorme, découverte marquante \
+d'une nouveauté du jeu, fail ou bug hilarant, action folle), fort dès les 3 premières secondes.
+- 7-8 : moment fort clair, compréhensible sans contexte, avec une vraie réaction du streamer.
+- 5-6 : correct mais banal (il conduit, il se balade, il commente calmement).
+- 1-4 : rien ne se passe, écran de chargement, menu, pause, discussion avec le chat sans \
+rapport, moment qui demande trop de contexte, image illisible, ou images qui ne montrent pas \
+le jeu indiqué (ex. un autre jeu, ou un ancien GTA alors que le jeu est GTA 6).
+Pour GTA 6 : la découverte d'une nouveauté concrète du jeu (mécanique, lieu, véhicule, PNJ, \
+police, détail réaliste) avec réaction est ce qui marche le mieux. \
+Donne aussi click_reason : la raison en 12 mots max.
+
 Corrections : la transcription vient d'une reconnaissance vocale automatique et contient \
 des erreurs (noms de streamers, termes de jeu, mots mal compris). Chaque mot est numéroté \
 [i]. Liste seulement les mots manifestement faux, avec leur numéro et le mot corrigé \
@@ -73,6 +88,8 @@ class ClipMetadata(BaseModel):
     confidence: str = Field(description="high | medium | low : à quel point le titre colle au contenu")
     hook: str = Field(description="Accroche incrustée en haut de la vidéo, 42 caractères max")
     corrections: list[Correction] = Field(description="Mots de la transcription à corriger")
+    click_score: int = Field(description="Potentiel de clic de 1 à 10, exigeant (voir consignes)")
+    click_reason: str = Field(description="Raison de la note, 12 mots max")
     start_s: float = Field(description="Début de la version recoupée, en secondes depuis le début du clip")
     end_s: float = Field(description="Fin de la version recoupée, en secondes depuis le début du clip")
 

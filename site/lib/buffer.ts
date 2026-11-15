@@ -106,7 +106,8 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
   const todo = clips
     .filter((c) => c.status === "approved" && c.video_url && isGtaClip(c))
     .filter((c) => !Object.values(c.networks ?? {}).some((n) => n?.state === "error" && now - +new Date(n.at) < RETRY_AFTER_MS))
-    .sort((a, b) => (a.decided_at ?? "").localeCompare(b.decided_at ?? ""));
+    // Le meilleur clip d'abord (note de clic), à égalité le plus ancien validé.
+    .sort((a, b) => (b.potential ?? 0) - (a.potential ?? 0) || (a.decided_at ?? "").localeCompare(b.decided_at ?? ""));
 
   // Horaires de publication (Programmation) : jours, plage horaire, plafond par jour.
   const nets = NETS.filter((n) => !schedule.nets?.length || schedule.nets.includes(n));
