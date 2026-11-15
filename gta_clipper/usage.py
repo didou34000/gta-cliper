@@ -106,6 +106,55 @@ def llm(model: str, resp) -> None:
     RUN["llm_usd"] += (tin * pin + cached * pin * 0.1 + tout * pout) / 1e6
 
 
+# --- Plafond de dépense Claude par jour (demande du 15/11 : jamais plus de 1 € par jour) ----
+# Les compteurs locaux disparaissent avec chaque machine GitHub : le total du jour est donc
+# relu dans le registre du mois sur R2 (somme des passages déjà finis aujourd'hui, heure de
+# Paris), plus ce que le passage en cours a déjà dépensé. Par prudence, 1 $ compte pour 1 €
+# (1 $ vaut moins de 1 €), donc la limite réelle est un peu sous 1 €.
+DAILY_LLM_USD = float(os.environ.get("LLM_MAX_USD_DAY") or 1.0)
+_TODAY: dict | None = None
+
+
+def _paris_day(iso: str | None = None) -> str:
+    from zoneinfo import ZoneInfo
+    t = datetime.fromisoformat(iso) if iso else datetime.now(timezone.utc)
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=timezone.utc)
+    return t.astimezone(ZoneInfo("Europe/Paris")).date().isoformat()
+
+
+def today_before_run() -> dict:
+    """Dépense Claude des passages déjà finis aujourd'hui (1 lecture R2, une fois par passage)."""
+    global _TODAY
+    if _TODAY is None:
+        _TODAY = {"usd": 0.0, "calls": 0}
+        try:
+            from . import s3lite
+            if s3lite.configured():
+                day = _paris_day()
+                keys = {f"usage/{datetime.now(timezone.utc):%Y-%m}.json"}
+                if day.endswith("-01"):  # minuit à Paris = encore le mois d'avant en UTC
+                    from datetime import timedelta
+                    keys.add(f"usage/{datetime.now(timezone.utc) - timedelta(days=1):%Y-%m}.json")
+                for key in keys:
+                    raw = s3lite.get(key)
+                    for r in (json.loads(raw) if raw else {}).get("runs") or []:
+                        if r.get("at") and _paris_day(r["at"]) == day:
+                            _TODAY["usd"] += float(r.get("llm_usd") or 0)
+                            _TODAY["calls"] += int(r.get("llm_calls") or 0)
+        except Exception as e:
+            log.warning("Dépense Claude du jour illisible (%s) : plafond compté sur ce passage", e)
+    return _TODAY
+
+
+def llm_spent_today() -> float:
+    return today_before_run()["usd"] + RUN["llm_usd"]
+
+
+def llm_calls_today() -> int:
+    return today_before_run()["calls"] + RUN["llm_calls"]
+
+
 def clip_done() -> None:
     RUN["clips"] += 1
 
