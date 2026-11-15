@@ -249,6 +249,8 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
                 meta["trim"] = {"start": round(start, 2), "end": round(end, 2),
                                 "original": round(duration, 2)}
             beat("titre", f"Titre : « {meta['title']} » · accroche : « {meta['hook']} »"
+                          + (f" · note de clic {meta['click_score']}/10 ({meta.get('click_reason', '')})"
+                             if meta.get("click_score") else "")
                           + (f" · {len(fixes)} mot(s) corrigé(s)" if fixes else "")
                           + (" (peu sûr, à vérifier)" if meta.get("confidence") == "low" else ""))
         except Exception as e:  # garde-fou ou panne de l'API : le clip n'est pas perdu
@@ -288,6 +290,11 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
         "created_at": datetime.now(timezone.utc).isoformat(),
         **({"run": cfg["_run"]} if cfg.get("_run") else {}), **(extra or {}),
     })
+    if meta.get("click_score"):  # note après avoir VU le clip : elle remplace celle de la miniature
+        if meta.get("potential"):
+            meta["potential_thumb"] = meta["potential"]
+        meta["potential"] = max(1, min(10, int(meta["click_score"])))
+        meta["potential_reason"] = (meta.get("click_reason") or "")[:100]
     (item_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),
                                         encoding="utf-8")
     return item_dir
@@ -356,8 +363,17 @@ def _auto_approve(item, extra: dict, rep, cfg: dict | None = None) -> bool:
     from .remote import approve, auto_approve_min
     if _AUTO_MIN is None:
         _AUTO_MIN = auto_approve_min()
-    pot = extra.get("potential")
+    try:
+        meta = json.loads((item / "meta.json").read_text(encoding="utf-8"))
+    except Exception:
+        meta = {}
+    # Seule compte la note donnée après avoir regardé le clip (images + paroles). Sans elle
+    # (IA en panne ou plafond atteint), pas de validation auto : le clip attend une décision.
+    pot = meta.get("click_score") if meta.get("kind") != "youtube" else meta.get("potential")
     if not _AUTO_MIN or not pot or pot < _AUTO_MIN:
+        if _AUTO_MIN and pot:
+            rep.event(f"Note de clic {pot}/10 sous le seuil {_AUTO_MIN} : laissé en validation "
+                      f"manuelle", node="site")
         return False
     from datetime import datetime, timezone
     from .schedule import before_gta6
@@ -366,10 +382,6 @@ def _auto_approve(item, extra: dict, rep, cfg: dict | None = None) -> bool:
         rep.event("Avant la sortie de GTA VI : pas de validation auto (la catégorie Twitch "
                   "contient surtout du GTA V)", node="site")
         return False
-    try:
-        meta = json.loads((item / "meta.json").read_text(encoding="utf-8"))
-    except Exception:
-        meta = {}
     if meta.get("confidence") == "low":
         rep.event(f"Potentiel {pot}/10 mais titre peu sûr : laissé en validation manuelle",
                   node="site")
