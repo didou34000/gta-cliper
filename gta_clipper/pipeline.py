@@ -250,6 +250,19 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
                 media.save_words(words, item_dir / "transcript.json")
                 text = media.transcript_text(words)
             meta = {**m, "hook": m.get("hook") or meta["hook"], "corrections": fixes}
+            # Titre retravaillé par un modèle plus fort (texte seul, ≈ 0,5-1 centime), seulement
+            # pour les clips qui ont une chance d'être publiés (note de clic ≥ 5).
+            if (meta.get("click_score") or 0) >= 5 and meta.get("moment"):
+                try:
+                    from .metadata import punch_title
+                    p = punch_title(streamer_name, game, meta["moment"], meta["title"], meta["hook"],
+                                    text, cfg["llm"].get("title_model", "claude-sonnet-5-5"))
+                    if p:
+                        first = meta["title"]
+                        meta["title"], meta["hook"] = p.title, p.hook or meta["hook"]
+                        meta["alt_titles"] = list(dict.fromkeys(p.alt_titles + [first]))[:3]
+                except Exception as e:
+                    log.warning("Titre renforcé impossible : %s", e)
             if cut:
                 start, end = cut
                 beat("titre", f"Recoupé autour du moment fort : {start:.0f} s → {end:.0f} s "

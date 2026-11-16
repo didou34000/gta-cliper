@@ -138,6 +138,7 @@ limits:
 llm:
   model: claude-haiku-5-5        # titres, accroche, description : ~0,1 centime par clip (claude-sonnet-5-5 ≈ 1,5 c, claude-opus-5-5 ≈ 3-4 c)
   rank_model: claude-haiku-5-5   # présélection bon marché des clips
+  title_model: claude-sonnet-5-5  # réécrit titre + accroche des clips notés ≥ 5/10 (texte seul, ≈ 0,5-1 centime)
   moments_model: claude-haiku-5-5  # lien YouTube : choix des moments (< 1 centime par heure de vidéo ; claude-sonnet-5-5 ≈ 8 c/h, meilleur choix)
   base_hashtags: ["#GTA6", "#GTAVI", "#GTA"]
 

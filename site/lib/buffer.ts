@@ -92,21 +92,29 @@ export const isGtaClip = (c: Clip) => GTA_RE.test([c.title, c.description, ...(c
 // clipper (vidéos niches, carrousels…) : on s'écarte d'eux aussi.
 const ORG = process.env.BUFFER_ORG_ID || "6ae8721deaf44e2b4ec5d7f2";
 const POSTS_QUERY = `query Posts($input: PostsInput!) {
-  posts(first: 100, input: $input) { edges { node { dueAt } } }
+  posts(first: 100, input: $input) { edges { node { dueAt sentAt } } }
 }`;
-export async function bufferDues(): Promise<number[]> {
+export async function bufferDues(): Promise<number[] | null> {
   try {
     const r = await fetch(API, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.BUFFER_API_KEY}` },
       body: JSON.stringify({ query: POSTS_QUERY, variables: { input: {
-        organizationId: ORG, filter: { channelIds: NETS.map((n) => CHANNELS[n]), status: ["scheduled", "sending"] } } } }),
+        organizationId: ORG, filter: {
+          channelIds: NETS.map((n) => CHANNELS[n]),
+          // programmés ET déjà publiés récemment : l'écart compte depuis le dernier post sorti
+          status: ["scheduled", "sending", "sent"],
+          dueAt: { start: new Date(Date.now() - 24 * 3600_000).toISOString() },
+        } } } }),
       cache: "no-store",
     });
     const j = await r.json().catch(() => null);
-    return (j?.data?.posts?.edges ?? []).map((e: { node: { dueAt?: string } }) => +new Date(e.node?.dueAt ?? 0)).filter((t: number) => t > 0);
+    if (!j?.data?.posts) { console.error("Buffer posts:", j?.errors?.[0]?.message ?? r.status); return null; }
+    return (j.data?.posts?.edges ?? [])
+      .map((e: { node: { dueAt?: string; sentAt?: string } }) => +new Date(e.node?.sentAt ?? e.node?.dueAt ?? 0))
+      .filter((t: number) => t > 0);
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -125,11 +133,12 @@ function freeSlot(from: number, busy: number[], gap: number, days: number[], sta
 
 /** Bouton « Publier » : programme CE clip sur Buffer au premier créneau libre (6 h d'écart),
  *  même si la publication auto est coupée. */
-export async function publishOne(id: string): Promise<{ ok: boolean; message: string }> {
+export async function publishOne(id: string): Promise<{ ok: boolean; message: string; due?: string }> {
   if (!bufferReady()) return { ok: false, message: "BUFFER_API_KEY manquante" };
   const [clips, { schedule }, external] = await Promise.all([loadClips(), loadSchedule(), bufferDues()]);
   const c = clips.find((x) => x.id === id);
   if (!c || !c.video_url) return { ok: false, message: "Clip ou vidéo introuvable" };
+  if (!external) return { ok: false, message: "Impossible de lire les posts déjà prévus dans Buffer : rien n'a été programmé, réessaie dans une minute" };
   const busy = [...new Set([...external, ...clips.flatMap(dues)])];
   const due = freeSlot(Date.now() + FIRST_DELAY_MS, busy, MANUAL_GAP_MS, schedule.pub_days, schedule.pub_from, schedule.pub_to);
   const nets = NETS.filter((n) => !schedule.nets?.length || schedule.nets.includes(n));
@@ -143,7 +152,7 @@ export async function publishOne(id: string): Promise<{ ok: boolean; message: st
     status: anyOk ? "posted" : "approved",
     title: c.title, description: c.description, hashtags: c.hashtags, post_url: c.post_url, networks,
   });
-  return anyOk ? { ok: true, message: `Programmé le ${due.toISOString()}` }
+  return anyOk ? { ok: true, message: `Programmé le ${due.toISOString()}`, due: due.toISOString() }
     : { ok: false, message: Object.values(networks).find((n) => n?.error)?.error ?? "Échec Buffer" };
 }
 
@@ -162,7 +171,7 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
   const now = Date.now();
   const every = Math.max(10, schedule.publish_every_min || 120) * 60_000;
 
-  const allDues = [...clips.flatMap(dues), ...external];
+  const allDues = [...clips.flatMap(dues), ...(external ?? [])];
   let inFlight = clips.filter((c) => dues(c).some((d) => d > now)).length;
   let last = allDues.length ? Math.max(...allDues) : 0;
 
