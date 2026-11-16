@@ -11,7 +11,7 @@
 | 13 nov | Carrousel "Faire le plein" (station-essence) | – | 1 165 | 14,7 s | – | 24 | 1 | engagement 2,15 % ; meilleur temps moyen des carrousels niche |
 | 15 nov 21h27 | Voler une voiture (paysage, HUD) | 47,6 s | en cours | | | | | stats Buffer encore à 0 le 16 nov 0h55 (rafraîchies 1×/jour) ; post 6afa154f60a910801c46dab6 ; Short YouTube 6afa15c68e87c256a38c94da (0 vue) |
 | 16 nov 12h30 | Carrousel "Braquer un magasin" (notif) | – | en cours | | | | | post Buffer 6afa475c06e1675856b430ab |
-| 16 nov 18h30 | Braquer un magasin (paysage, HUD, voix Chatterbox) | 38,9 s | en cours | | | | | 1re vidéo SANS ElevenLabs ; plus courte (38,9 s vs 44-47 s) ; TikTok 6afac46a60a910801c7f0923, Short 6afac46b06e1675856db9b02 |
+| 16 nov 18h30 | Braquer un magasin (paysage, HUD, voix ElevenLabs Tom) | 42,5 s | en cours | | | | | voix refaite en ElevenLabs à 10h (1re version Chatterbox jamais publiée) ; TikTok 6afac46a60a910801c7f0923, Short 6afac46b06e1675856db9b02 |
 
 ## Ce qui marche (constaté)
 - Format 5 étapes + "tac" + sous-titres mot à mot + titres dégradé GTA : "Faire le plein" a fait le meilleur taux de likes.
@@ -44,7 +44,8 @@
 - Cash perdu à la mort / arrêté → dépôt au distributeur ; 3 niveaux d'argent (banque, cash, valeur du sac).
 - Échapper aux caméras / profil criminel (visage, vêtements, véhicule mémorisés).
 
-## Décision voix (16 nov 8h38)
+## Décision voix (16 nov 8h38, ANNULÉE à 9h55)
+- 9h55 : le propriétaire revient sur sa décision : « Bon fais voix éleven labs ». Voix = ElevenLabs (Tom, stYaAhI2xTaJ48ozXkGt, eleven_v4) pour lundi, mardi et mercredi, dans la limite des crédits. Chatterbox reste en secours si les crédits manquent.
 - Le propriétaire a choisi : PAS d'ElevenLabs pour la voix, voix gratuite Chatterbox (open source, licence MIT) générée en local. Les bruitages existants restent utilisables.
 
 ## Note du fil principal (16 nov ~9h)
@@ -62,7 +63,9 @@
 - Limites honnêtes : voix plus neutre/moins "créateur" qu'ElevenLabs, quelques mots moins nets ("Tire" compris "tu es" par Whisper). Le propriétaire n'a pas pu comparer avant publication.
 
 ## Budget
-- ElevenLabs : 4 178 crédits restants le 16 nov 8h54 (58 842 / 63 020 utilisés, inchangé depuis 0h55), reset 25 nov. Voix désormais Chatterbox (gratuite) : les crédits ne servent plus qu'aux bruitages éventuels.
+- ElevenLabs : 4 178 crédits restants le 16 nov 8h54 (58 842 / 63 020 utilisés, inchangé depuis 0h55), reset 25 nov. MAJ 16 nov 10h05 : 2 303 crédits restants (60 717 / 63 020). Voix braquage = 755 crédits ; ~1 120 autres crédits partis entre-temps (autre fil, vidéo portrait « 5 choses »). Il reste de quoi faire mardi + mercredi (~750-1 100 chacune) seulement si rien d'autre n'en consomme ; réserve mini 300.
+
+- 16 nov ~9h05 : le propriétaire a finalement demandé la voix ElevenLabs pour « 5 choses » (fil principal) : voix Hugo, 2 prises = 1 120 crédits. Compteur lu ensuite : 60 717 / 63 020 → 2 303 crédits restants (l'écart de ~755 crédits avec 4 178 − 1 120 vient d'un autre fil). Garder 300 de réserve : il reste de quoi faire ~1 vidéo ElevenLabs (2 prises ≈ 1 100) avant le 25 nov.
 
 ## Dernière vidéo
 - 2026-11-15 21:27 (Paris) : Voler une voiture.
@@ -70,7 +73,7 @@
 ## Production par jour (plan 16-18 nov : 1 carrousel notif + 1 vidéo auto par jour)
 | Jour | Sujet | Carrousel (post Buffer) | Vidéo TikTok | Short YouTube |
 |---|---|---|---|---|
-| lun 16 | Braquer un magasin (masque, tir d'intimidation, coffre à code, sac → receleur, cash perdu) | FAIT : 6afa475c06e1675856b430ab, notif 12:30 ; images branche claude/project-thread-xla67j carrousels/braquage/ ; fichiers /mnt/project-files/carrousel-gta6/braquage/ | FAIT : 6afac46a60a910801c7f0923, auto 18:30 (paysage, 38,9 s, voix Chatterbox) | FAIT : 6afac46b06e1675856db9b02, auto 18:30 (vertical) |
+| lun 16 | Braquer un magasin (masque, tir d'intimidation, coffre à code, sac → receleur, cash perdu) | FAIT : 6afa475c06e1675856b430ab, notif 12:30 ; images branche claude/project-thread-xla67j carrousels/braquage/ ; fichiers /mnt/project-files/carrousel-gta6/braquage/ | FAIT : 6afac46a60a910801c7f0923, auto 18:30 (paysage, 42,5 s, voix ElevenLabs, videos/braquage-gta6-el.mp4) | FAIT : 6afac46b06e1675856db9b02, auto 18:30 (videos/braquage-gta6-el-vertical.mp4) |
 | mar 17 | | | | |
 | mer 18 | | | | |
 
@@ -79,3 +82,4 @@
 - 2026-11-16 8h40-9h55 : vidéo braquage faite avec Chatterbox (0 crédit) et programmée 18h30. Sujets retirés pour éviter le doublon avec la vidéo portrait "5 choses qu'on ne pourra plus faire" (autre fil) : masque/caméras et cash perdu à la mort.
 - 2026-11-16 0h55 : analyse (pas de nouvelles stats), carrousel du jour programmé. Vidéo reportée : le propriétaire a écrit le 15 nov à 22h49 "la voix pas de leven labs hein" (sens ambigu), question posée par carte de décision dans le fil du passage de 0h55 (lire ce fil avant de produire). Si pas de réponse au passage de 16h54 : vidéo avec la voix ElevenLabs Tom (plan validé), en gardant le format paysage HUD. NB : hébergement sur la branche claude/project-thread-xla67j (branche de ce passage), pas uxcv0v.
 - 2026-11-16 8h54 : analyse seulement (pas de stats neuves). Carrousel du jour déjà programmé (12:30), vidéo du jour en cours dans le fil du passage de 0h55 (voix Chatterbox) : rien refait.
+- 2026-11-16 9h55-10h05 : voix du braquage refaite en ElevenLabs (Tom, 1 prise, 755 crédits, 41 s). Timings mot à mot via faster-whisper local (gratuit, pas de Scribe). Habillage remappé automatiquement sur la nouvelle voix (table ancien→nouveau temps, make_braq_el.py/mix_braq_el.py dans videos-gta6/braquage/elevenlabs/). Planche vérifiée. Les 2 posts 18h30 pointent vers les nouveaux fichiers (-el). Astuce : faster-whisper local suffit pour caler les sous-titres, inutile de payer Scribe.
