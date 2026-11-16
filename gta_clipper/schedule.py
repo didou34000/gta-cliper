@@ -121,6 +121,13 @@ def main() -> int:
             print(f"::warning::{e}")
             run, why, cfg = False, f"pas de passage : {e}", None
     print(why)
+    if s3lite.configured():  # le site affiche « Moteur actif · vérifié il y a X min · raison »
+        try:
+            s3lite.put("schedule/check.json", json.dumps(
+                {"at": now.isoformat(), "run": run, "why": why}, ensure_ascii=False).encode(),
+                "application/json")
+        except Exception as e:
+            print(f"::warning::état du moteur non enregistré : {e}")
     values = {"run": "true" if run else "false"}
     if run and cfg:
         values |= {"jeu": str(cfg.get("game") or "Grand Theft Auto VI")[:80],
