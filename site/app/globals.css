@@ -416,3 +416,12 @@ input.title{font-weight:700;font-size:16px}
 .lv-clip.st-posted::after{content:" · publié";color:var(--ok);font-size:12px}
 .lv-more{font-size:12.5px;color:var(--dim)}
 .lv-noclip{margin:4px 0 0;padding-top:8px;border-top:1px solid var(--line);font-size:12.5px;color:var(--dim)}
+
+/* Bouton « Publier » : action principale de la carte */
+.btn-publish{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:4px;padding:13px 18px;border:0;border-radius:12px;
+  background:var(--grad);color:#fff;font:inherit;font-weight:800;font-size:15px;letter-spacing:.2px;cursor:pointer;
+  box-shadow:0 8px 22px -8px rgba(255,62,165,.6),inset 0 1px 0 rgba(255,255,255,.25);transition:transform .12s ease,box-shadow .12s ease,filter .12s ease}
+.btn-publish:hover{transform:translateY(-1px);filter:brightness(1.07);box-shadow:0 12px 26px -8px rgba(255,62,165,.7),inset 0 1px 0 rgba(255,255,255,.25)}
+.btn-publish:active{transform:translateY(0)}
+.btn-publish:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.btn-publish svg{flex:none}

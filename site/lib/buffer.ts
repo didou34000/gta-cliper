@@ -147,6 +147,10 @@ export async function publishOne(id: string): Promise<{ ok: boolean; message: st
     : { ok: false, message: Object.values(networks).find((n) => n?.error)?.error ?? "Échec Buffer" };
 }
 
+// Règle du 16/11 : un clip qui ne dépasse pas 6/10 ne part jamais tout seul (il reste dans
+// « À poster » ; le bouton « Publier » reste possible, c'est alors un choix fait à la main).
+export const MIN_SCORE = 7;
+
 const dues = (c: Clip) =>
   Object.values(c.networks ?? {}).filter((n) => n?.state === "scheduled" && n.due).map((n) => +new Date(n!.due!));
 
@@ -163,7 +167,7 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
   let last = allDues.length ? Math.max(...allDues) : 0;
 
   const todo = clips
-    .filter((c) => c.status === "approved" && c.video_url && isGtaClip(c))
+    .filter((c) => c.status === "approved" && c.video_url && isGtaClip(c) && (c.potential ?? 0) >= MIN_SCORE)
     .filter((c) => !Object.values(c.networks ?? {}).some((n) => n?.state === "error" && now - +new Date(n.at) < RETRY_AFTER_MS))
     // Le meilleur clip d'abord (note de clic), à égalité le plus ancien validé.
     .sort((a, b) => (b.potential ?? 0) - (a.potential ?? 0) || (a.decided_at ?? "").localeCompare(b.decided_at ?? ""));
