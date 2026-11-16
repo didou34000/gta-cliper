@@ -1,4 +1,4 @@
-import { BufferMissing, Kpi, NetBadge, PageHead, Panel, ViewsChart, linkPosts, type Ctx } from "../ctx";
+import { BufferMissing, Kpi, NetBadge, PageHead, Panel, ViewsChart, engineState, linkPosts, type Ctx } from "../ctx";
 import { totals } from "@/lib/stats";
 import { ago, compact, dayTime, fmtMin, hhmm, inFuture, pct } from "@/lib/format";
 
@@ -55,7 +55,9 @@ export default function Overview({ ctx }: { ctx: Ctx }) {
             <li><span>Étape</span><b>{last?.step ?? "—"}</b></li>
             <li><span>Programmation</span>
               <b>{schedule.enabled ? `toutes les ${fmtMin(schedule.every_min)}` : "arrêtée"}</b></li>
-            <li><span>Prochain passage</span><b>{ctx.nextRun ? hhmm(ctx.nextRun.toISOString()) : "—"}</b></li>
+            <li><span>Moteur</span><b className={engineState(ctx.check).on ? "tx-idle" : "tx-error"}>{engineState(ctx.check).label}{ctx.check ? ` · vérifié ${ago(ctx.check.at)}` : ""}</b></li>
+            {ctx.check?.why && <li><span>Dernier contrôle</span><b>{ctx.check.why}</b></li>}
+            <li><span>Prochain passage</span><b>{ctx.nextRun ? dayTime(ctx.nextRun.toISOString()) : "—"}</b></li>
             <li><span>Dernier passage programmé</span><b>{ctx.lastRun ? ago(ctx.lastRun) : "jamais"}</b></li>
             <li><span>Validation auto</span><b>{schedule.auto_min ? `potentiel ≥ ${schedule.auto_min}/10` : "non"}</b></li>
             <li><span>Rythme de publication</span><b>1 clip / {fmtMin(schedule.publish_every_min)}</b></li>

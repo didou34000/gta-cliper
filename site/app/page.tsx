@@ -2,10 +2,11 @@ import LiveBar from "./LiveBar";
 import { latestRun } from "@/lib/github";
 import { loadClipsAndSize, loadHeartbeat } from "@/lib/data";
 import { loadSchedule, nextRunAt } from "@/lib/schedule";
-import { budget, countPage, flushSiteOps, r2Configured } from "@/lib/r2";
+import { budget, countPage, flushSiteOps, getJsonKey, r2Configured } from "@/lib/r2";
 import { loadUsage } from "@/lib/usage";
 import { loadStats } from "@/lib/stats";
-import { botState, type Ctx } from "./ctx";
+import { botState, engineState, type Ctx } from "./ctx";
+import { ago, dayTime } from "@/lib/format";
 import Overview from "./views/Overview";
 import ClipsView from "./views/Clips";
 import StatsView from "./views/Stats";
@@ -41,9 +42,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   const view = (NAV.find((n) => n.key === want)?.key ?? "accueil") as View;
 
   countPage();
-  const [{ last }, { clips, bytes }, { schedule, lastRun }, stats, run, usage] = await Promise.all([
+  const [{ last }, { clips, bytes }, { schedule, lastRun }, stats, run, usage, check] = await Promise.all([
     loadHeartbeat(), loadClipsAndSize(), loadSchedule(), loadStats(), latestRun(),
     view === "reglages" ? loadUsage() : Promise.resolve(null),
+    getJsonKey<{ at: string; run: boolean; why: string }>("schedule/check.json").catch(() => null),
   ]);
   const lang = /^[a-z]{2,5}$/.test(sp.lang ?? "") ? sp.lang : undefined;
   const lives = view === "lives" ? await loadLives(lang) : null;
@@ -59,7 +61,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       posted: clips.filter((c) => c.status === "posted").length,
     },
     nextRun: nextRunAt(schedule, lastRun),
+    check,
   };
+  const engine = engineState(check);
   const badge: Partial<Record<View, number>> = { valider: ctx.counts.pending, poster: ctx.counts.approved };
   const groups = [...new Set(NAV.map((n) => n.group))];
 
@@ -73,6 +77,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
         <p className={`side-bot bot-${state.key}`}>
           <span className="dot" aria-hidden="true" />
           <span>Bot : <b>{state.label}</b></span>
+        </p>
+        <p className={`side-engine ${engine.on ? "on" : "off"}`} title={check?.why ?? ""}>
+          <span className="dot" aria-hidden="true" />
+          <span><b>{engine.label}</b>{check ? ` · vérifié ${ago(check.at)}` : ""}
+            {schedule.enabled && ctx.nextRun ? <><br />Prochain passage : {dayTime(ctx.nextRun.toISOString())}</> : null}
+            {check?.why && !check.run ? <><br /><small>{check.why}</small></> : null}</span>
         </p>
         <nav className="nav" aria-label="Sections">
           {groups.map((g) => (

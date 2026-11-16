@@ -15,12 +15,20 @@ export type Ctx = {
   schedule: Schedule;
   lastRun: string | null;
   nextRun: Date | null;
+  check: { at: string; run: boolean; why: string } | null; // dernier contrôle du moteur (toutes les 10 min)
   stats: StatsResult;
   configured: boolean;
   counts: { pending: number; approved: number; posted: number };
 };
 
 const OFFLINE_AFTER_MIN = 75;
+
+/** Le moteur GitHub contrôle toutes les 10 min : au-delà de 25 min sans nouvelles, il est arrêté. */
+export function engineState(check: Ctx["check"]): { on: boolean; label: string } {
+  if (!check) return { on: false, label: "aucune nouvelle du moteur" };
+  const min = (Date.now() - new Date(check.at).getTime()) / 60000;
+  return min <= 25 ? { on: true, label: "moteur actif" } : { on: false, label: "moteur arrêté" };
+}
 
 export function botState(last: Heartbeat | null): Ctx["state"] {
   const minutes = last ? (Date.now() - new Date(last.ts).getTime()) / 60000 : Infinity;
