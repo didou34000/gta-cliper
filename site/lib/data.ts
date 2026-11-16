@@ -34,7 +34,7 @@ export type Clip = {
   networks?: Networks;        // publication par réseau (lib/buffer.ts)
 };
 
-export type NetworkState = { state: "scheduled" | "posted" | "draft" | "error"; due?: string; id?: string; url?: string; error?: string; at: string };
+export type NetworkState = { state: "scheduled" | "posted" | "draft" | "error"; due?: string; id?: string; url?: string; error?: string; at: string; auto?: boolean };
 export type Networks = Partial<Record<"tiktok" | "youtube" | "instagram", NetworkState>>;
 
 export type RunInfo = {
