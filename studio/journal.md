@@ -11,6 +11,7 @@
 | 13 nov | Carrousel "Faire le plein" (station-essence) | – | 1 165 | 14,7 s | – | 24 | 1 | engagement 2,15 % ; meilleur temps moyen des carrousels niche |
 | 15 nov 21h27 | Voler une voiture (paysage, HUD) | 47,6 s | en cours | | | | | stats Buffer encore à 0 le 16 nov 0h55 (rafraîchies 1×/jour) ; post 6afa154f60a910801c46dab6 ; Short YouTube 6afa15c68e87c256a38c94da (0 vue) |
 | 16 nov 12h30 | Carrousel "Braquer un magasin" (notif) | – | en cours | | | | | post Buffer 6afa475c06e1675856b430ab |
+| 16 nov 18h30 | Braquer un magasin (paysage, HUD, voix Chatterbox) | 38,9 s | en cours | | | | | 1re vidéo SANS ElevenLabs ; plus courte (38,9 s vs 44-47 s) ; TikTok 6afac46a60a910801c7f0923, Short 6afac46b06e1675856db9b02 |
 
 ## Ce qui marche (constaté)
 - Format 5 étapes + "tac" + sous-titres mot à mot + titres dégradé GTA : "Faire le plein" a fait le meilleur taux de likes.
@@ -26,6 +27,11 @@
 - Le YouTube Short reste à ~0 vue (3 vues pour "7 nouveautés") : YouTube ne pousse pas encore la chaîne, ne pas en tirer de conclusion.
 - Partages : "Semer la police" (9) loin devant ; "Faire le plein" 1 seul partage malgré 145 likes → sujet qui plaît mais qu'on n'envoie pas à un pote. Piste : sujets "astuce qui change ta façon de jouer" (police, braquage) > sujets "info".
 
+## Analyse du 16 nov 8h54
+- Toujours aucune stat neuve : la dernière mise à jour Buffer des métriques TikTok date du 15 nov 14h10 (Paris). "Voler une voiture" (TikTok + Short) affiche encore 0 car ses métriques n'ont été lues qu'à la publication. Buffer rafraîchit environ 1 fois par 24 h : jugeable au passage de 16h54.
+- Aucune copie "via network" de "Voler une voiture" n'est encore remontée dans Buffer.
+- Conclusions inchangées (voir analyse de 0h55). Pas de nouvelle hypothèse sans nouvelles données.
+
 ## Hypothèses à tester (une ou deux à la fois)
 1. Vidéo plus courte (30-35 s) → rétention plus haute ?
 2. Chiffre ou image choc dès 0,5 s, et annoncer la meilleure étape ("la 5e est la pire").
@@ -38,8 +44,25 @@
 - Cash perdu à la mort / arrêté → dépôt au distributeur ; 3 niveaux d'argent (banque, cash, valeur du sac).
 - Échapper aux caméras / profil criminel (visage, vêtements, véhicule mémorisés).
 
+## Décision voix (16 nov 8h38)
+- Le propriétaire a choisi : PAS d'ElevenLabs pour la voix, voix gratuite Chatterbox (open source, licence MIT) générée en local. Les bruitages existants restent utilisables.
+
+## Note du fil principal (16 nov ~9h)
+- Le propriétaire a aussi demandé dans le fil principal une vidéo PORTRAIT « 5 choses qu'on ne pourra plus faire dans GTA 6 »
+  (style de sa vidéo de référence, STYLE-REFERENCE.md), montrée d'abord SANS voix ; il confirmera la voix ensuite.
+  C'est le fil principal qui la gère et elle ne sera postée qu'après son accord : ne la refais pas et ne la poste pas.
+  Fichiers : /mnt/project-files/videos-gta6/5-choses/. Sujets déjà couverts dedans : 4 armes max + coffre, essence, traceur, caméras/masque, cash perdu.
+
+## Voix Chatterbox : mode d'emploi (validé 16 nov)
+- Fichiers : /mnt/project-files/videos-gta6/braquage/ (tts.py, gen.py = génération + contrôle Whisper + coupe auto, script2.txt, make_braq.py, mix_braq.py).
+- Installation : python3 -m venv /home/user/cb ; pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu ; pip install chatterbox-tts faster-whisper (~5 min). ChatterboxMultilingualTTS, language_id="fr", voix par défaut (pas de clonage), exaggeration 0.55, temperature 0.65.
+- 1 phrase par ligne ; écrire "G.T.A. six" (sinon prononcé "JT A 6") ; "Étape un :" au lieu de "Un." ; éviter "t'enfuir" (mal prononcé).
+- gen.py fait jusqu'à 6 prises par phrase et garde celle que Whisper comprend le mieux (sinon : hallucinations en fin de phrase). ~2 min par phrase sur CPU.
+- Voix finale : concat + atempo 1.08 + compresseur + loudnorm. Timings mot à mot : faster-whisper, réalignés sur le texte du script.
+- Limites honnêtes : voix plus neutre/moins "créateur" qu'ElevenLabs, quelques mots moins nets ("Tire" compris "tu es" par Whisper). Le propriétaire n'a pas pu comparer avant publication.
+
 ## Budget
-- ElevenLabs : 4 178 crédits restants le 16 nov 0h55 (58 842 / 63 020 utilisés), reset 25 nov.
+- ElevenLabs : 4 178 crédits restants le 16 nov 8h54 (58 842 / 63 020 utilisés, inchangé depuis 0h55), reset 25 nov. Voix désormais Chatterbox (gratuite) : les crédits ne servent plus qu'aux bruitages éventuels.
 
 ## Dernière vidéo
 - 2026-11-15 21:27 (Paris) : Voler une voiture.
@@ -47,10 +70,12 @@
 ## Production par jour (plan 16-18 nov : 1 carrousel notif + 1 vidéo auto par jour)
 | Jour | Sujet | Carrousel (post Buffer) | Vidéo TikTok | Short YouTube |
 |---|---|---|---|---|
-| lun 16 | Braquer un magasin (masque, tir d'intimidation, coffre à code, sac → receleur, cash perdu) | FAIT : 6afa475c06e1675856b430ab, notif 12:30 ; images branche claude/project-thread-xla67j carrousels/braquage/ ; fichiers /mnt/project-files/carrousel-gta6/braquage/ | À FAIRE (passage 8h54 ou 16h54, 18:30) : en attente de la réponse du propriétaire sur la voix (ElevenLabs ou pas) | À FAIRE |
+| lun 16 | Braquer un magasin (masque, tir d'intimidation, coffre à code, sac → receleur, cash perdu) | FAIT : 6afa475c06e1675856b430ab, notif 12:30 ; images branche claude/project-thread-xla67j carrousels/braquage/ ; fichiers /mnt/project-files/carrousel-gta6/braquage/ | FAIT : 6afac46a60a910801c7f0923, auto 18:30 (paysage, 38,9 s, voix Chatterbox) | FAIT : 6afac46b06e1675856db9b02, auto 18:30 (vertical) |
 | mar 17 | | | | |
 | mer 18 | | | | |
 
 ## Historique des passages
 - 2026-11-15 : boucle créée.
+- 2026-11-16 8h40-9h55 : vidéo braquage faite avec Chatterbox (0 crédit) et programmée 18h30. Sujets retirés pour éviter le doublon avec la vidéo portrait "5 choses qu'on ne pourra plus faire" (autre fil) : masque/caméras et cash perdu à la mort.
 - 2026-11-16 0h55 : analyse (pas de nouvelles stats), carrousel du jour programmé. Vidéo reportée : le propriétaire a écrit le 15 nov à 22h49 "la voix pas de leven labs hein" (sens ambigu), question posée par carte de décision dans le fil du passage de 0h55 (lire ce fil avant de produire). Si pas de réponse au passage de 16h54 : vidéo avec la voix ElevenLabs Tom (plan validé), en gardant le format paysage HUD. NB : hébergement sur la branche claude/project-thread-xla67j (branche de ce passage), pas uxcv0v.
+- 2026-11-16 8h54 : analyse seulement (pas de stats neuves). Carrousel du jour déjà programmé (12:30), vidéo du jour en cours dans le fil du passage de 0h55 (voix Chatterbox) : rien refait.
