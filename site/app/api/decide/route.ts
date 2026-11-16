@@ -25,13 +25,15 @@ export async function POST(req: Request) {
     post_url: String(f.get("post_url") ?? "").trim() || undefined,
   });
   // Un clip validé part tout de suite dans la file Buffer (si la clé est configurée).
-  let note = "";
+  let note = "", due = "";
   if (publishNow) {
-    const r = await publishOne(id).catch((e) => ({ ok: false, message: String(e) }));
+    const r: { ok: boolean; message: string; due?: string } = await publishOne(id).catch((e) => ({ ok: false, message: String(e) }));
     note = r.ok ? "" : r.message;
+    due = r.due ?? "";
   } else if (status === "approved") await publishQueue().catch(() => {});
   const back = String(f.get("back") ?? "/");
   const url = new URL(back.startsWith("/") ? back : "/", req.url);
   if (note) url.searchParams.set("erreur", note.slice(0, 200));
+  if (due) url.searchParams.set("publie", due);
   return NextResponse.redirect(url, 303);
 }

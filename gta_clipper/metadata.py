@@ -104,6 +104,8 @@ class ClipMetadata(BaseModel):
     confidence: str = Field(description="high | medium | low : à quel point le titre colle au contenu")
     hook: str = Field(description="Accroche incrustée en haut de la vidéo, 42 caractères max")
     corrections: list[Correction] = Field(description="Mots de la transcription à corriger")
+    moment: str = Field(description="Ce qui se passe concrètement dans le clip (2 phrases max), "
+                                    "vu sur les images et entendu : sert à réécrire le titre")
     click_score: int = Field(description="Potentiel de clic de 1 à 10, exigeant (voir consignes)")
     click_reason: str = Field(description="Raison de la note, 12 mots max")
     start_s: float = Field(description="Début de la version recoupée, en secondes depuis le début du clip")
@@ -178,6 +180,52 @@ def generate_metadata(streamer_name: str, transcript: str, twitch_title: str = "
     meta.title = meta.title.strip().strip('"')[:100]
     meta.hook = meta.hook.strip().strip('"')[:60]
     return meta
+
+
+class Punch(BaseModel):
+    title: str = Field(description="Le titre le plus accrocheur, 70 caractères max")
+    alt_titles: list[str] = Field(description="2 autres titres forts")
+    hook: str = Field(description="Accroche incrustée, 3 à 7 mots, 40 caractères max, en MAJUSCULES")
+
+
+PUNCH_SYSTEM = """Tu es le meilleur rédacteur de titres TikTok / YouTube Shorts de France pour \
+une page de clips de streamers (gaming). On te donne ce qui se passe dans un clip (vu et \
+entendu), un premier titre et une première accroche. Ton travail : les rendre IRRÉSISTIBLES, \
+sans mentir.
+
+""" + SYSTEM.split("Description :")[0].split("Règles du titre :", 1)[-1].join(["Règles du titre :", ""]) + \
+"""
+""" + SYSTEM.split("Accroche (hook) :", 1)[-1].split("Découpe (start_s", 1)[0].join(["Accroche (hook) :", ""]) + """
+En plus :
+- Le titre doit créer une émotion immédiate (rire, choc, curiosité, « non il a pas fait ça »).
+- Commence par le streamer ou par l'élément le plus fort, jamais par un mot faible.
+- Bannis les formulations scolaires et molles : "tente", "essaie", "fait", "découvre" seul, \
+"un moment", "une scène", "finit mal" (dis COMMENT ça finit).
+- Le jeu indiqué figure dans le titre (ex. "sur GTA 6"), jamais un autre jeu.
+- Pas de mensonge : si ce n'est pas dans la description du moment, ça n'existe pas."""
+
+
+def punch_title(streamer: str, game: str, moment: str, title: str, hook: str,
+                transcript: str = "", model: str = "claude-sonnet-5-5") -> Punch | None:
+    """Réécrit titre + accroche avec un modèle plus fort, en texte seul (≈ 0,5-1 centime)."""
+    from .guard import Guard
+    if not Guard.get().allow_llm():
+        return None
+    user = (f"Streamer : {streamer}\nJeu : {game or '(non précisé)'}\n"
+            f"Ce qui se passe : {moment}\nPremier titre : {title}\nPremière accroche : {hook}\n\n"
+            f"Paroles (auto) :\n<transcription>\n{(transcript or '(aucune)')[:2500]}\n</transcription>")
+    client = anthropic.Anthropic(max_retries=2, timeout=60)
+    resp = client.messages.parse(model=model, max_tokens=600, system=PUNCH_SYSTEM,
+                                 output_config={"effort": "low"},
+                                 messages=[{"role": "user", "content": user}], output_format=Punch)
+    from . import usage
+    usage.llm(model, resp)
+    if resp.stop_reason == "refusal" or not resp.parsed_output:
+        return None
+    p = resp.parsed_output
+    p.title = p.title.strip().strip('"')[:100]
+    p.hook = p.hook.strip().strip('"')[:60]
+    return p
 
 
 class Translation(BaseModel):
