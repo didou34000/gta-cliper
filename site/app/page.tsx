@@ -105,7 +105,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       <main className="main">
         {sp.erreur && <p className="notice notice-ko" role="alert">Publication impossible : {sp.erreur}</p>}
         {sp.publie && !Number.isNaN(+new Date(sp.publie)) && (
-          <p className="notice notice-ok" role="status">✓ Programmé sur TikTok + YouTube pour {dayTime(sp.publie)} (6 h d&apos;écart au moins avec les autres posts).</p>
+          <p className="notice notice-ok" role="status">✓ Programmé sur TikTok + YouTube pour {dayTime(sp.publie)} (1 h 30 d&apos;écart au moins avec les autres posts).</p>
         )}
         <LiveBar key={sent ?? 0} initial={{ run, beat: last, now: new Date().toISOString() }} sent={sent} full={view === "bot"} />
         {ctx.configured && budget().blocked && <p className="banner">Plafond de sécurité atteint : la moitié du quota gratuit Cloudflare R2 est consommée ce mois-ci, le bot ne se lance plus et le site n&apos;écrit plus rien jusqu&apos;au 1er du mois. Rien ne sera facturé.</p>}

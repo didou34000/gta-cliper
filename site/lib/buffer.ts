@@ -118,7 +118,7 @@ export async function bufferDues(): Promise<number[] | null> {
   }
 }
 
-const MANUAL_GAP_MS = 6 * 3600_000; // bouton « Publier » : 6 h au moins entre deux posts
+const MANUAL_GAP_MS = 90 * 60_000; // bouton « Publier » : 1 h 30 au moins entre deux posts (règle du 16/11)
 
 /** Premier créneau autorisé (jours/heures de publication) à au moins `gap` de tout post prévu. */
 function freeSlot(from: number, busy: number[], gap: number, days: number[], start: number, end: number): Date {
@@ -131,7 +131,7 @@ function freeSlot(from: number, busy: number[], gap: number, days: number[], sta
   return t;
 }
 
-/** Bouton « Publier » : programme CE clip sur Buffer au premier créneau libre (6 h d'écart),
+/** Bouton « Publier » : programme CE clip sur Buffer au premier créneau libre (1 h 30 d'écart),
  *  même si la publication auto est coupée. */
 export async function publishOne(id: string): Promise<{ ok: boolean; message: string; due?: string }> {
   if (!bufferReady()) return { ok: false, message: "BUFFER_API_KEY manquante" };
