@@ -228,6 +228,61 @@ def punch_title(streamer: str, game: str, moment: str, title: str, hook: str,
     return p
 
 
+class Judge(BaseModel):
+    click_score: int = Field(description="Note de clic finale de 1 à 10, très exigeante")
+    click_reason: str = Field(description="La raison en 15 mots max")
+
+
+JUDGE_SYSTEM = """Tu es le juge final d'une page TikTok / YouTube Shorts de clips de streamers. \
+Ta note décide SEULE si le clip est publié automatiquement (7/10 minimum). Une note trop \
+généreuse publie un clip faible sur le compte : dans le doute, note plus bas.
+
+On te donne beaucoup d'images du clip dans l'ordre, la transcription, le titre Twitch et le \
+nombre de vues du clip sur Twitch. Juge ce qu'on VOIT et ENTEND, pas ce que le titre promet : \
+une histoire racontée (« il saute », « il finit dans le coma ») ne vaut rien si l'image ne \
+montre pas clairement l'action ou la réaction.
+
+""" + SYSTEM.split("Note de clic (click_score, de 1 à 10) :", 1)[-1].split("Donne aussi click_reason", 1)[0].join(
+    ["Barème :", ""]) + """
+En plus :
+- Le nombre de vues Twitch est un signal des viewers : un clip très peu vu (moins de 100 vues) \
+dépasse rarement 6, sauf si l'image montre un moment évidemment fort.
+- 7 = je le posterais sans hésiter sur un compte qui vise des millions de vues. Sinon 6 ou moins."""
+
+
+def judge_click(streamer: str, game: str, frames: list, frame_times: list[float] | None,
+                transcript: str, twitch_title: str = "", views: int | None = None,
+                duration: float = 0.0, model: str = "claude-sonnet-5-5") -> Judge | None:
+    """Note de clic finale par un modèle plus fort, avec plus d'images (≈ 1,5-2 centimes)."""
+    import base64
+    from .guard import Guard
+    if not Guard.get().allow_llm():
+        return None
+    content: list = [{"type": "text", "text": f"{len(frames)} images du clip, dans l'ordre :"}]
+    for k, f in enumerate(frames):
+        if frame_times and k < len(frame_times):
+            content.append({"type": "text", "text": f"Image à {frame_times[k]:.0f} s :"})
+        content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                                    "data": base64.b64encode(f.read_bytes()).decode()}})
+    content.append({"type": "text", "text": (
+        f"Streamer : {streamer}\nJeu : {game or '(non précisé)'}\n"
+        + (f"Durée : {duration:.0f} s\n" if duration else "")
+        + (f"Vues du clip sur Twitch : {views}\n" if views is not None else "")
+        + f"Titre Twitch : {twitch_title or '(aucun)'}\n\n"
+        f"Transcription (auto) :\n<transcription>\n{(transcript or '(pas de parole)')[:3000]}\n</transcription>")})
+    client = anthropic.Anthropic(max_retries=2, timeout=90)
+    resp = client.messages.parse(model=model, max_tokens=400, system=JUDGE_SYSTEM,
+                                 output_config={"effort": "low"},
+                                 messages=[{"role": "user", "content": content}], output_format=Judge)
+    from . import usage
+    usage.llm(model, resp)
+    if resp.stop_reason == "refusal" or not resp.parsed_output:
+        return None
+    j = resp.parsed_output
+    j.click_score = max(1, min(10, int(j.click_score)))
+    return j
+
+
 class Translation(BaseModel):
     lines: list[str] = Field(description="Une traduction française par ligne, même nombre et même ordre")
 

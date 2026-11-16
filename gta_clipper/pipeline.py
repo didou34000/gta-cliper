@@ -250,6 +250,27 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
                 media.save_words(words, item_dir / "transcript.json")
                 text = media.transcript_text(words)
             meta = {**m, "hook": m.get("hook") or meta["hook"], "corrections": fixes}
+            # Note finale par Sonnet (règle du 16/11 : Haiku est trop généreux), avec plus
+            # d'images et les vues Twitch. Seulement si Haiku met 6 ou plus : en dessous le clip
+            # ne sera de toute façon pas publié (et ça garde le passage sous 1 $/jour).
+            if (meta.get("click_score") or 0) >= 6:
+                try:
+                    from .metadata import judge_click
+                    nj = 16 if duration > 30 else 12
+                    jf = media.sample_frames(video, item_dir / "frames_judge", duration, n=nj, width=640)
+                    jt = [duration * (int(f.stem) + 0.5) / nj for f in jf]
+                    j = judge_click(streamer_name, game, jf, jt, text, twitch_title,
+                                    (extra or {}).get("views"), duration,
+                                    cfg["llm"].get("judge_model", "claude-sonnet-5-5"))
+                    if j:
+                        log.info("[%s] Note de clic : Haiku %s/10 → Sonnet %s/10 (%s)", streamer_name,
+                                 meta["click_score"], j.click_score, j.click_reason)
+                        meta["click_score_haiku"] = meta["click_score"]
+                        meta["click_score"], meta["click_reason"] = j.click_score, j.click_reason
+                except LimitReached:
+                    raise
+                except Exception as e:
+                    log.warning("Note Sonnet impossible (%s) : on garde la note Haiku", str(e)[:150])
             # Titre retravaillé par un modèle plus fort (texte seul, ≈ 0,5-1 centime), seulement
             # pour les clips qui ont une chance d'être publiés (note de clic ≥ 5).
             if (meta.get("click_score") or 0) >= 5 and meta.get("moment"):
