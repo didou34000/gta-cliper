@@ -504,30 +504,6 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
                   f"(ou choisis « Tous les jeux »). Passage arrêté.",
                   node="twitch", level="error", force=True)
         return []
-    top_n = int(os.environ.get("TOP_STREAMERS") or cfg.get("top_streamers") or 0)
-    if top_n > 0:
-        game_label = cfg["game_name"] if game_id else "tous les jeux"
-        rep.event(f"Recherche des {top_n} plus gros streamers {lang_label(cfg)} sur {game_label}", node="twitch",
-                  force=True)
-        top = tw.top_streamers(game_id, n=min(top_n, 20), hours=cfg["lookback_hours"],
-                               language=cfg.get("stream_language", "fr"),
-                               known=[s["login"] for s in cfg.get("streamers", [])],
-                               min_views=cfg["min_clip_views"])
-        st = getattr(tw, "last_top_stats", {})
-        if not top:
-            rep.event(f"Aucun streamer {lang_label(cfg)} n'a de clip à {cfg['min_clip_views']} vues ou plus sur "
-                      f"{game_label} dans les {cfg['lookback_hours']} dernières heures "
-                      f"({st.get('candidats', 0)} streamers vérifiés"
-                      + (f" ; meilleur clip trouvé : {st['meilleur'][0]} vues chez {st['meilleur'][1]}"
-                         if st.get("meilleur", (0,))[0] else " ; aucun clip sur ce jeu")
-                      + "). Baisse les vues minimum ou choisis un autre jeu. Passage arrêté.",
-                      node="twitch", level="warn", force=True)
-            return []
-        cfg["streamers"] = [{"login": t["login"], "name": t["name"]} for t in top]
-        for t in top:
-            rep.streamer(t["name"])
-        rep.event("Streamers retenus : " + ", ".join(f"{t['name']} ({t['why']})" for t in top),
-                  node="twitch", force=True)
     already = seen_ids(cfg)
     from .remote import seen_on_site
     _prune(cfg, rep)
@@ -536,11 +512,54 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
         already |= {sid for sid in on_site}
     work = Path(cfg["paths"]["work"])
     produced: list[Path] = []
-    hours, min_views = cfg["lookback_hours"], cfg["min_clip_views"]
-
+    top_n = int(os.environ.get("TOP_STREAMERS") or cfg.get("top_streamers") or 0)
+    game_label_ = cfg["game_name"] if game_id else "tous les jeux"
+    h0, v0 = int(cfg["lookback_hours"]), int(cfg["min_clip_views"])
+    # Règle du 16/11 : un passage doit toujours sortir un clip. Si les filtres choisis ne
+    # laissent rien passer, on élargit (fenêtre plus longue, puis moins de vues) ; c'est la
+    # note de clic (7/10 minimum) qui décide ensuite de la publication, pas ces filtres.
+    attempts = [(h0, v0)]
+    if os.environ.get("RELAX_FILTERS", "1") != "0":
+        for h, v in ((max(h0, 6), min(v0, 100)), (max(h0, 24), min(v0, 50)),
+                     (max(h0, 72), min(v0, 20)), (max(h0, 168), 0)):
+            if (h, v) not in attempts:
+                attempts.append((h, v))
     try:
-        _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, produced,
-                        hours, min_views)
+        for i, (hours, min_views) in enumerate(attempts):
+            last = i == len(attempts) - 1
+            cfg["lookback_hours"], cfg["min_clip_views"] = hours, min_views
+            if i:
+                rep.event(f"Rien d'exploitable avec les filtres précédents : on élargit à "
+                          f"{hours} h et {min_views} vues minimum", node="twitch", force=True)
+            if top_n > 0:
+                rep.event(f"Recherche des {top_n} plus gros streamers {lang_label(cfg)} sur "
+                          f"{game_label_}", node="twitch", force=True)
+                top = tw.top_streamers(game_id, n=min(top_n, 20), hours=hours,
+                                       language=cfg.get("stream_language", "fr"),
+                                       known=[s["login"] for s in cfg.get("streamers", [])
+                                              if not s.get("_auto")],
+                                       min_views=min_views)
+                st = getattr(tw, "last_top_stats", {})
+                if not top:
+                    rep.event(f"Aucun streamer {lang_label(cfg)} n'a de clip à {min_views} vues ou "
+                              f"plus sur {game_label_} dans les {hours} dernières heures "
+                              f"({st.get('candidats', 0)} streamers vérifiés"
+                              + (f" ; meilleur clip trouvé : {st['meilleur'][0]} vues chez "
+                                 f"{st['meilleur'][1]}" if st.get("meilleur", (0,))[0]
+                                 else " ; aucun clip sur ce jeu")
+                              + (")." if not last else "). Passage arrêté."),
+                              node="twitch", level="warn", force=True)
+                    continue
+                cfg["streamers"] = [{"login": t["login"], "name": t["name"], "_auto": True}
+                                    for t in top]
+                for t in top:
+                    rep.streamer(t["name"])
+                rep.event("Streamers retenus : " + ", ".join(f"{t['name']} ({t['why']})" for t in top),
+                          node="twitch", force=True)
+            done = _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work,
+                                   produced, hours, min_views, retry=not last)
+            if done is not None:
+                break
     except LimitReached as e:
         rep.event(f"Garde-fou : {e}. Reprise au prochain passage.", level="warn", force=True)
     finally:
@@ -556,7 +575,8 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
 
 
 def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, produced,
-                    hours, min_views):
+                    hours, min_views, retry: bool = False):
+    """Renvoie None quand rien de neuf n'a été trouvé et qu'on peut réessayer plus large."""
     from .twitch import fetch_chat_offsets_gql, load_chat_offsets
     pool: list[dict] = []
     min_dur = float(cfg.get("min_clip_duration", 20))
@@ -633,6 +653,9 @@ def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, pr
                                extra={"kind": "vod_chat_spike", "chat_zscore": h.score})
         info["etat"] = "en attente"
 
+    if not pool and retry:
+        rep.event("Aucun nouveau clip candidat avec ces filtres", node="scoring", force=True)
+        return None
     _pick_and_make(cfg, skip_llm, rep, work, produced, already, pool)
     return produced
 
