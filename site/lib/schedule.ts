@@ -98,6 +98,16 @@ export function nextRunAt(s: Schedule, lastRun: string | null): Date | null {
   const base = lastRun ? new Date(Math.max(+now, +new Date(lastRun) + everyAt(s, now) * 60000)) : now;
   return nextAllowed(base, s.days, s.run_from, s.run_to);
 }
+/** Les n prochains passages automatiques prévus (mêmes règles que le bot). */
+export function upcomingRuns(s: Schedule, lastRun: string | null, n = 5): Date[] {
+  const out: Date[] = [];
+  let t = nextRunAt(s, lastRun);
+  for (let i = 0; t && i < n; i++) {
+    out.push(t);
+    t = nextAllowed(new Date(+t + everyAt(s, t) * 60000), s.days, s.run_from, s.run_to);
+  }
+  return out;
+}
 export const VIEWS_OPTIONS = [20, 50, 100, 200, 500, 1000, 5000];
 export const AUTO_OPTIONS = [0, 7, 8, 9]; // jamais sous 7 : un clip à 6/10 ou moins ne part pas seul
 export const HOURS_OPTIONS = [1, 2, 3, 4, 6, 8, 12, 18, 24, 36, 48, 72, 100, 168, 200, 336, 720];

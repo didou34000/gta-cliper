@@ -15,7 +15,8 @@ export type Ctx = {
   schedule: Schedule;
   lastRun: string | null;
   nextRun: Date | null;
-  check: { at: string; run: boolean; why: string } | null; // dernier contrôle du moteur (toutes les 10 min)
+  check: { at: string; run: boolean; why: string } | null;
+  upcoming: Date[]; // prochains passages automatiques // dernier contrôle du moteur (toutes les 10 min)
   stats: StatsResult;
   configured: boolean;
   counts: { pending: number; approved: number; posted: number };
@@ -151,3 +152,31 @@ export function linkPosts(stats: StatsResult, clips: Clip[]) {
   return { all: rows, bot };
 }
 export type LinkedPost = ReturnType<typeof linkPosts>["all"][number];
+
+/** Carte « Moteur » : tourne-t-il, dernier contrôle, pourquoi il attend, prochains passages. */
+export function EngineCard({ ctx }: { ctx: Ctx }) {
+  const e = engineState(ctx.check);
+  const fmt = (d: Date) => d.toLocaleString("fr-FR", { timeZone: "Europe/Paris", weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return (
+    <section className={`engine-card ${e.on ? "on" : "off"}`} aria-label="Moteur automatique">
+      <div className="engine-top">
+        <span className="dot" aria-hidden="true" />
+        <b>{e.on ? "Le bot tourne" : "Le bot est arrêté"}</b>
+        {ctx.check && <span className="muted">· vérifié {agoShort(ctx.check.at)}</span>}
+      </div>
+      {!ctx.schedule.enabled ? <p className="engine-why">Mode automatique éteint : rien ne se lance tout seul.</p>
+        : ctx.check?.why && !ctx.check.run ? <p className="engine-why">{ctx.check.why}</p> : null}
+      {ctx.schedule.enabled && ctx.upcoming.length > 0 && (
+        <div className="engine-next">
+          <span className="engine-label">Prochains passages</span>
+          <ol>{ctx.upcoming.map((d, i) => <li key={i} className={i === 0 ? "first" : ""}>{fmt(d)}</li>)}</ol>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function agoShort(iso: string) {
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : `il y a ${Math.floor(m / 60)} h`;
+}

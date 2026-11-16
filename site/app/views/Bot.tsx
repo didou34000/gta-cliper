@@ -1,4 +1,4 @@
-import { PageHead, Panel, type Ctx } from "../ctx";
+import { EngineCard, PageHead, Panel, type Ctx } from "../ctx";
 import { ago } from "@/lib/format";
 
 // Le suivi pas à pas (étapes + journal) est dans la barre en direct, en haut de la page.
@@ -14,6 +14,8 @@ export default function BotView({ ctx }: { ctx: Ctx }) {
       >
         <a href="/?v=programmation" className="btn-primary">Lancer quelque chose</a>
       </PageHead>
+
+      <EngineCard ctx={ctx} />
 
       <div className="kpis kpis-3">
         <a href="/?v=valider" className="kpi kpi-link kpi-violet"><span className="kpi-label">À valider</span><span className="kpi-value">{counts.pending}</span><span className="kpi-hint">clips qui attendent ton OK</span></a>

@@ -1,4 +1,4 @@
-import { BufferMissing, Kpi, NetBadge, PageHead, Panel, ViewsChart, engineState, linkPosts, type Ctx } from "../ctx";
+import { BufferMissing, EngineCard, Kpi, NetBadge, PageHead, Panel, ViewsChart, engineState, linkPosts, type Ctx } from "../ctx";
 import { totals } from "@/lib/stats";
 import { ago, compact, dayTime, fmtMin, hhmm, inFuture, pct } from "@/lib/format";
 
@@ -26,6 +26,7 @@ export default function Overview({ ctx }: { ctx: Ctx }) {
       >
         <a href="/?v=programmation" className="btn-primary">Lancer un passage</a>
       </PageHead>
+      <EngineCard ctx={ctx} />
 
       <div className="kpis">
         <Kpi label="Vues (clips du bot)" tone="pink" value={connected ? compact(t.views) : "—"}
