@@ -53,7 +53,14 @@ export async function latestRun(): Promise<LiveRun | null> {
   });
   if (!runs.length) return null;
   runs.sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const r = runs.find((x) => x.status !== "completed") ?? runs[0];
+  // Un passage « en file d'attente » depuis plus de 10 min alors qu'un passage plus récent
+  // a déjà tourné est un fantôme côté GitHub (jamais démarré) : on l'ignore pour ne pas
+  // cacher le vrai passage.
+  const ghost = (x: (typeof runs)[number], i: number) =>
+    x.status === "queued" && Date.now() - +new Date(x.created_at) > 10 * 60_000 && runs.slice(0, i).some((y) => y.status !== "queued");
+  const real = runs.filter((x, i) => !ghost(x, i));
+  if (!real.length) return null;
+  const r = real.find((x) => x.status !== "completed") ?? real[0];
   const run: LiveRun = {
     id: r.id, kind: r.w.kind, event: r.event, status: r.status, conclusion: r.conclusion,
     created_at: r.created_at, updated_at: r.updated_at, url: r.html_url,
