@@ -12,6 +12,7 @@ on:
       heures: { description: "Fenêtre en heures (1 à 720)", default: "" }
       auto_min: { description: "Validation auto si potentiel ≥ N/10 (0 = jamais)", default: "" }
       publish_every_min: { description: "Un post toutes les N min (10 à 720)", default: "" }
+      jours: { description: "Jours des passages : tous, ou ex. lun,mar,mer (0 = dimanche)", default: "" }
       publication: { description: "Publication auto Buffer : on / off (vide = inchangé)", default: "" }
 permissions:
   contents: read
@@ -37,3 +38,4 @@ jobs:
           SET_AUTO_MIN: ${{ inputs.auto_min }}
           SET_PUBLISH_EVERY_MIN: ${{ inputs.publish_every_min }}
           SET_PUBLICATION: ${{ inputs.publication }}
+          SET_JOURS: ${{ inputs.jours }}

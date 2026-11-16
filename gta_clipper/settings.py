@@ -79,6 +79,16 @@ def main() -> int:
     game = os.environ.get("SET_JEU", "").strip()
     if game:
         new["game"] = game[:80]
+    jours = os.environ.get("SET_JOURS", "").strip().lower()
+    if jours:
+        if jours in ("tous", "all", "*"):
+            new["days"] = list(range(7))
+        else:
+            names = {"dim": 0, "lun": 1, "mar": 2, "mer": 3, "jeu": 4, "ven": 5, "sam": 6}
+            ds = sorted({names.get(x.strip()[:3], int(x) if x.strip().isdigit() else -1)
+                         for x in jours.split(",")} & set(range(7)))
+            if ds:
+                new["days"] = ds
     for k, (lo, hi) in INTS.items():
         v = os.environ.get(f"SET_{k.upper()}", "").strip()
         if v.isdigit():
