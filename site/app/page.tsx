@@ -1,7 +1,7 @@
 import LiveBar from "./LiveBar";
 import { latestRun } from "@/lib/github";
 import { loadClipsAndSize, loadHeartbeat } from "@/lib/data";
-import { loadSchedule, nextRunAt } from "@/lib/schedule";
+import { loadSchedule, nextRunAt, upcomingRuns } from "@/lib/schedule";
 import { budget, countPage, flushSiteOps, getJsonKey, r2Configured } from "@/lib/r2";
 import { loadUsage } from "@/lib/usage";
 import { loadStats } from "@/lib/stats";
@@ -62,6 +62,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
     },
     nextRun: nextRunAt(schedule, lastRun),
     check,
+    upcoming: upcomingRuns(schedule, lastRun, 5),
   };
   const engine = engineState(check);
   const badge: Partial<Record<View, number>> = { valider: ctx.counts.pending, poster: ctx.counts.approved };

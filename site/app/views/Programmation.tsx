@@ -1,8 +1,8 @@
-import { PageHead, Panel, type Ctx } from "../ctx";
+import { EngineCard, PageHead, Panel, type Ctx } from "../ctx";
 import { GAMES, REPO, STREAMERS } from "@/lib/launch";
 import { bufferReady, publishEnabled } from "@/lib/buffer";
 import { AUTO_OPTIONS, DAY_NAMES, DAY_ORDER, EVERY_OPTIONS, HOURS_OPTIONS, HOUR_OPTIONS, LANG_OPTIONS, NET_OPTIONS, PUBLISH_OPTIONS, PUB_MAX_OPTIONS, TOP_OPTIONS, VIEWS_OPTIONS } from "@/lib/schedule";
-import { ago, fmtMin, hhmm } from "@/lib/format";
+import { ago, fmtMin } from "@/lib/format";
 
 const VIEWS_HINT: Record<number, string> = { 200: " (conseillé)" }
 const HOURS_HINT: Record<number, string> = { 3: " (lives en cours)", 24: " (conseillé)" };
@@ -79,7 +79,7 @@ function OtherGame({ value }: { value?: string }) {
 }
 
 export default async function ProgView({ ctx, launch, prog, yt }: { ctx: Ctx; launch?: string; prog?: string; yt?: string }) {
-  const { schedule, state, lastRun, nextRun } = ctx;
+  const { schedule, state, lastRun } = ctx;
   const pubOn = bufferReady() && (await publishEnabled());
   const busy = state.key === "running";
   const err = launch ?? yt;
@@ -152,10 +152,8 @@ export default async function ProgView({ ctx, launch, prog, yt }: { ctx: Ctx; la
       >
         <form method="post" action="/api/schedule" className="stack">
           <input type="hidden" name="section" value="auto" />
-          <p className="muted small">
-            {schedule.enabled ? (nextRun ? `Prochain passage vers ${hhmm(nextRun.toISOString())}.` : "") : "Le bot ne tourne que quand tu le lances."}
-            {lastRun ? ` Dernier passage automatique ${ago(lastRun)}.` : ""}
-          </p>
+          <EngineCard ctx={ctx} />
+          {lastRun ? <p className="muted small">Dernier passage automatique {ago(lastRun)}.</p> : null}
           <p className="sentence">
             Toutes les <select name="every_min" defaultValue={String(schedule.every_min)} aria-label="Fréquence">
               {EVERY_OPTIONS.map((n) => <option key={n} value={n}>{fmtMin(n)}</option>)}

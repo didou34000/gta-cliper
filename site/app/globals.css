@@ -432,8 +432,21 @@ input.title{font-weight:700;font-size:16px}
 .side-engine .dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex:none;background:var(--muted)}
 .side-engine.on .dot{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
 .side-engine.off .dot{background:#ef4444}
-@media (max-width:860px){.side-engine{display:none}}
+@media (max-width:900px){.side-engine{display:none}} /* sur téléphone : la carte « Le bot tourne » est en haut des pages */
 
 .notice{margin:0 0 14px;padding:12px 14px;border-radius:12px;font-weight:600;font-size:14px;border:1px solid}
 .notice-ok{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.4);color:#4ade80}
 .notice-ko{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.45);color:#f87171}
+
+.engine-card{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.engine-card.on{border-color:rgba(34,197,94,.35)} .engine-card.off{border-color:rgba(239,68,68,.4)}
+.engine-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:15px}
+.engine-top .dot{width:10px;height:10px;border-radius:50%;flex:none}
+.engine-card.on .engine-top .dot{background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.18)}
+.engine-card.off .engine-top .dot{background:#ef4444}
+.engine-why{margin:0;font-size:13px;color:var(--warn)}
+.engine-label{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.engine-next ol{margin:4px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px}
+.engine-next li{font-size:13px;padding:4px 10px;border-radius:999px;border:1px solid var(--line2)}
+.engine-next li::first-letter{text-transform:uppercase}
+.engine-next li.first{background:var(--grad);color:#fff;border-color:transparent;font-weight:700}
