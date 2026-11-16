@@ -33,7 +33,7 @@ const NAV: { key: View; label: string; icon: string; group: string }[] = [
 // Anciens liens (?tab=pending…) toujours valables.
 const LEGACY: Record<string, View> = { pending: "valider", approved: "poster", posted: "stats" };
 
-type Search = { sent?: string; v?: string; tab?: string; launch?: string; prog?: string; yt?: string; scope?: string; net?: string; jeu?: string; lang?: string; q?: string };
+type Search = { sent?: string; v?: string; tab?: string; launch?: string; prog?: string; yt?: string; scope?: string; net?: string; jeu?: string; lang?: string; q?: string; erreur?: string };
 
 export default async function Home({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
@@ -93,6 +93,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       </aside>
 
       <main className="main">
+        {sp.erreur && <p className="warn" role="alert">Publication impossible : {sp.erreur}</p>}
         <LiveBar key={sent ?? 0} initial={{ run, beat: last, now: new Date().toISOString() }} sent={sent} full={view === "bot"} />
         {ctx.configured && budget().blocked && <p className="banner">Plafond de sécurité atteint : la moitié du quota gratuit Cloudflare R2 est consommée ce mois-ci, le bot ne se lance plus et le site n&apos;écrit plus rien jusqu&apos;au 1er du mois. Rien ne sera facturé.</p>}
         {!ctx.configured && <p className="banner">Stockage non configuré : les clés R2 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL) manquent sur Vercel.</p>}

@@ -133,13 +133,15 @@ export default async function ClipsView({ ctx, status }: { ctx: Ctx; status: "pe
 
                     {pending ? (
                       <div className="actions">
-                        <button className="btn ok" name="status" value="approved">Valider</button>
+                        <button className="btn ok" name="status" value="publish" title="Programme sur TikTok et YouTube au premier créneau libre (6 h d'écart avec les autres posts)">Publier</button>
+                        <button className="btn ghost" name="status" value="approved">Valider</button>
                         <button className="btn ko" name="status" value="rejected" title="Supprime définitivement le clip">Rejeter (supprime)</button>
                       </div>
                     ) : (
                       <>
                         <NetworkLine c={c} />
                         <div className="actions">
+                          {c.status === "approved" && <button className="btn ok" name="status" value="publish" title="Programme sur TikTok et YouTube au premier créneau libre (6 h d'écart avec les autres posts)">Publier</button>}
                           <CopyPost text={post} />
                           {c.video_url && <a className="btn ghost" href={c.video_url} target="_blank" rel="noreferrer">Ouvrir la vidéo</a>}
                         </div>
