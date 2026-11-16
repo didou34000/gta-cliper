@@ -322,10 +322,22 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
     render.render_vertical(video, ass, out, width=rc["width"], height=rc["height"],
                            layout=rc["layout"], facecam=rc.get("facecam"), start=start,
                            duration=duration)
-    render.extract_thumbnail(out, item_dir / "thumb.jpg", at=min(1.5, duration / 2))
+    cover_ok = False
+    handle = cfg.get("account_handle", "@gta6francenews")
+    if cfg.get("cover", True):
+        try:  # miniature avec le titre (gratuit) : 3 premières images + vignette du site
+            render.make_cover(video, start + duration * 0.45, meta["title"], handle,
+                              item_dir / "thumb.jpg", rc["width"], rc["height"])
+            render.add_cover(out, item_dir / "thumb.jpg")
+            cover_ok = True
+        except Exception as e:
+            log.warning("Miniature impossible : %s", str(e)[:150])
+    if not cover_ok:
+        render.extract_thumbnail(out, item_dir / "thumb.jpg", at=min(1.5, duration / 2))
     beat("render", f"Vidéo prête ({out.stat().st_size / 1e6:.1f} Mo, {duration:.0f} s)")
 
     meta.update({
+        "cover": cover_ok,
         "source_id": source_id, "source_url": source_url, "streamer": streamer_name,
         "twitch_title": twitch_title, "duration": round(duration, 2),
         "transcript": text, "status": "pending",
