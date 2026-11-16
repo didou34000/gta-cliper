@@ -88,6 +88,65 @@ async function send(net: Net, c: Clip, due: Date): Promise<NetworkState> {
 const GTA_RE = /\bgta\b|gta ?(6|vi)\b|grand theft auto/i;
 export const isGtaClip = (c: Clip) => GTA_RE.test([c.title, c.description, ...(c.hashtags ?? [])].join(" "));
 
+// Posts déjà programmés dans Buffer sur nos comptes, y compris ceux qui ne viennent pas du
+// clipper (vidéos niches, carrousels…) : on s'écarte d'eux aussi.
+const ORG = process.env.BUFFER_ORG_ID || "6ae8721deaf44e2b4ec5d7f2";
+const POSTS_QUERY = `query Posts($input: PostsInput!) {
+  posts(first: 100, input: $input) { edges { node { dueAt } } }
+}`;
+export async function bufferDues(): Promise<number[]> {
+  try {
+    const r = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.BUFFER_API_KEY}` },
+      body: JSON.stringify({ query: POSTS_QUERY, variables: { input: {
+        organizationId: ORG, filter: { channelIds: NETS.map((n) => CHANNELS[n]), status: ["scheduled", "sending"] } } } }),
+      cache: "no-store",
+    });
+    const j = await r.json().catch(() => null);
+    return (j?.data?.posts?.edges ?? []).map((e: { node: { dueAt?: string } }) => +new Date(e.node?.dueAt ?? 0)).filter((t: number) => t > 0);
+  } catch {
+    return [];
+  }
+}
+
+const MANUAL_GAP_MS = 6 * 3600_000; // bouton « Publier » : 6 h au moins entre deux posts
+
+/** Premier créneau autorisé (jours/heures de publication) à au moins `gap` de tout post prévu. */
+function freeSlot(from: number, busy: number[], gap: number, days: number[], start: number, end: number): Date {
+  let t = nextAllowed(new Date(from), days, start, end);
+  for (let i = 0; i < 60; i++) {
+    const clash = busy.filter((d) => Math.abs(d - +t) < gap);
+    if (!clash.length) return t;
+    t = nextAllowed(new Date(Math.max(...clash) + gap), days, start, end);
+  }
+  return t;
+}
+
+/** Bouton « Publier » : programme CE clip sur Buffer au premier créneau libre (6 h d'écart),
+ *  même si la publication auto est coupée. */
+export async function publishOne(id: string): Promise<{ ok: boolean; message: string }> {
+  if (!bufferReady()) return { ok: false, message: "BUFFER_API_KEY manquante" };
+  const [clips, { schedule }, external] = await Promise.all([loadClips(), loadSchedule(), bufferDues()]);
+  const c = clips.find((x) => x.id === id);
+  if (!c || !c.video_url) return { ok: false, message: "Clip ou vidéo introuvable" };
+  const busy = [...new Set([...external, ...clips.flatMap(dues)])];
+  const due = freeSlot(Date.now() + FIRST_DELAY_MS, busy, MANUAL_GAP_MS, schedule.pub_days, schedule.pub_from, schedule.pub_to);
+  const nets = NETS.filter((n) => !schedule.nets?.length || schedule.nets.includes(n));
+  const networks: Networks = { ...(c.networks ?? {}) };
+  for (const net of nets) {
+    if (networks[net]?.state === "scheduled" || networks[net]?.state === "posted") continue;
+    networks[net] = await send(net, c, due);
+  }
+  const anyOk = Object.values(networks).some((n) => n?.state === "scheduled" || n?.state === "posted");
+  await saveDecision(c.id, {
+    status: anyOk ? "posted" : "approved",
+    title: c.title, description: c.description, hashtags: c.hashtags, post_url: c.post_url, networks,
+  });
+  return anyOk ? { ok: true, message: `Programmé le ${due.toISOString()}` }
+    : { ok: false, message: Object.values(networks).find((n) => n?.error)?.error ?? "Échec Buffer" };
+}
+
 const dues = (c: Clip) =>
   Object.values(c.networks ?? {}).filter((n) => n?.state === "scheduled" && n.due).map((n) => +new Date(n!.due!));
 
@@ -95,11 +154,11 @@ const dues = (c: Clip) =>
 export async function publishQueue(): Promise<{ ok: boolean; sent: number; message: string }> {
   if (!bufferReady()) return { ok: false, sent: 0, message: "BUFFER_API_KEY manquante : publication auto désactivée" };
   if (!(await publishEnabled())) return { ok: false, sent: 0, message: "Publication auto coupée sur le site" };
-  const [clips, { schedule }] = await Promise.all([loadClips(), loadSchedule()]);
+  const [clips, { schedule }, external] = await Promise.all([loadClips(), loadSchedule(), bufferDues()]);
   const now = Date.now();
   const every = Math.max(10, schedule.publish_every_min || 120) * 60_000;
 
-  const allDues = clips.flatMap(dues);
+  const allDues = [...clips.flatMap(dues), ...external];
   let inFlight = clips.filter((c) => dues(c).some((d) => d > now)).length;
   let last = allDues.length ? Math.max(...allDues) : 0;
 

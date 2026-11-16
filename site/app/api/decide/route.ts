@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { deleteClip, saveDecision, type Status } from "@/lib/data";
-import { publishQueue } from "@/lib/buffer";
+import { publishOne, publishQueue } from "@/lib/buffer";
 
 const ALLOWED: Status[] = ["pending", "approved", "rejected", "posted"];
 
 export async function POST(req: Request) {
   const f = await req.formData();
   const id = String(f.get("id") ?? "");
-  const status = String(f.get("status") ?? "") as Status;
+  const raw = String(f.get("status") ?? "");
+  const publishNow = raw === "publish"; // bouton « Publier » : validé + programmé tout de suite
+  const status = (publishNow ? "approved" : raw) as Status;
   if (!id || !ALLOWED.includes(status)) {
     return NextResponse.json({ error: "Requête invalide" }, { status: 400 });
   }
@@ -23,7 +25,13 @@ export async function POST(req: Request) {
     post_url: String(f.get("post_url") ?? "").trim() || undefined,
   });
   // Un clip validé part tout de suite dans la file Buffer (si la clé est configurée).
-  if (status === "approved") await publishQueue().catch(() => {});
+  let note = "";
+  if (publishNow) {
+    const r = await publishOne(id).catch((e) => ({ ok: false, message: String(e) }));
+    note = r.ok ? "" : r.message;
+  } else if (status === "approved") await publishQueue().catch(() => {});
   const back = String(f.get("back") ?? "/");
-  return NextResponse.redirect(new URL(back.startsWith("/") ? back : "/", req.url), 303);
+  const url = new URL(back.startsWith("/") ? back : "/", req.url);
+  if (note) url.searchParams.set("erreur", note.slice(0, 200));
+  return NextResponse.redirect(url, 303);
 }
