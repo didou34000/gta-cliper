@@ -30,6 +30,7 @@ export type Clip = {
   run?: RunInfo;              // passage qui a produit le clip
   rank?: number;              // place dans le classement de ce passage
   potential?: number | null;  // note de potentiel /10 (présélection Claude Haiku)
+  cover?: boolean;            // miniature (titre + compte) incrustée sur les premières images
   potential_reason?: string;
   networks?: Networks;        // publication par réseau (lib/buffer.ts)
 };

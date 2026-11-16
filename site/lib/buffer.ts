@@ -52,7 +52,9 @@ function inputFor(net: Net, c: Clip, due: Date) {
     schedulingType: "automatic",
     mode: "customScheduled",
     dueAt: due.toISOString(),
-    assets: [{ video: { url: c.video_url } }],
+    // Miniature avec le titre incrustée au tout début de la vidéo : on la désigne comme
+    // couverture (TikTok et Instagram seulement ; YouTube choisit lui-même).
+    assets: [{ video: { url: c.video_url, ...(c.cover && net !== "youtube" ? { metadata: { thumbnailOffset: 30 } } : {}) } }],
   };
   if (net === "tiktok") return { ...base, text: caption(c), metadata: { tiktok: { title: c.title.slice(0, 90) } } };
   if (net === "instagram") return { ...base, text: caption(c), metadata: { instagram: { type: "reel", shouldShareToFeed: true } } };
@@ -65,6 +67,13 @@ function inputFor(net: Net, c: Clip, due: Date) {
 }
 
 async function send(net: Net, c: Clip, due: Date): Promise<NetworkState> {
+  const r = await sendOnce(net, c, due);
+  // Si Buffer refuse la couverture choisie, on renvoie sans (le post compte plus que la miniature).
+  if (r.state === "error" && c.cover && net !== "youtube") return sendOnce(net, { ...c, cover: false }, due);
+  return r;
+}
+
+async function sendOnce(net: Net, c: Clip, due: Date): Promise<NetworkState> {
   const at = new Date().toISOString();
   try {
     const r = await fetch(API, {
