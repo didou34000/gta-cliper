@@ -22,6 +22,20 @@ Les exemples ci-dessus parlent de GTA 6, mais n'écris JAMAIS "GTA 6" (ni un aut
 n'est pas le jeu indiqué. Si le jeu est "(non précisé)", ne cite aucun jeu dans le titre, \
 l'accroche, la description ni les hashtags.
 - 70 caractères max, en français naturel, sans guillemets, 0 ou 1 emoji.
+- IL DOIT TAPER DANS L'ŒIL (demande ferme du propriétaire : les titres trop plats ne passent \
+pas). Avant de répondre, imagine 5 titres et garde le plus cliquable qui reste vrai. Leviers :
+  · un verbe fort et imagé plutôt que neutre : "pète un câble", "se fait humilier", \
+"détruit", "tombe sur", "craque", "panique", "explose de rire", "se fait voler" valent mieux \
+que "découvre", "teste", "réagit", "joue" (à éviter sauf vraie découverte) ;
+  · l'enjeu ou la conséquence : ce qui rend le moment fou, absurde, drôle ou violent ;
+  · un détail précis qui intrigue : un chiffre (en 10 secondes, 3 étoiles, 200 km/h), \
+un superlatif vrai (la pire, la plus rapide, la première), un contraste ("croit être \
+tranquille… mais") ;
+  · l'élément le plus fort en premier, phrase courte, rythme oral.
+  Exemples plats → percutants : "Michou fait du VTT sur GTA 5" → "Michou dévale une \
+montagne en VTT et finit en miettes sur GTA 5" ; "Tatiana croise la police sur GTA 6" → \
+"Tatiana prend un passant pour un flic et panique sur GTA 6" ; "Gotaga teste une voiture" → \
+"Gotaga trouve la voiture la plus rapide de GTA 6 et la crashe direct".
 - Le titre doit décrire ce qui se passe VRAIMENT dans la transcription. \
 N'invente pas d'événement, de lieu ou de réaction absents du contenu. \
 Si la transcription est trop pauvre pour savoir ce qui se passe, reste général \
@@ -47,7 +61,9 @@ Les images portent leur instant (en secondes) et la transcription a des repères
 Donne le début et la fin, en secondes depuis le début du clip, de la version qui garde \
 LE moment fort en entier : commence juste avant que l'action ou la phrase qui le lance \
 démarre (le spectateur doit comprendre la situation en 1 ou 2 secondes), termine juste \
-après la réaction ou la conclusion. Coupe ce qui traîne après (temps mort, écran de fin, \
+après la réaction ou la conclusion : la fin tombe sur la chute (la punchline, le cri, le crash, \
+le rire), au plus 1 seconde après. Un clip qui continue 3 à 5 secondes après la chute fait \
+décrocher : coupe-le. Coupe ce qui traîne après (temps mort, écran de fin, \
 discussion sans rapport, nouvelle partie). Ne commence jamais au milieu d'une phrase. \
 Entre 15 et 60 secondes. Si le clip est déjà bien coupé, renvoie 0 et la durée totale.
 

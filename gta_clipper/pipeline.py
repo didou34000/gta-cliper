@@ -139,6 +139,9 @@ def apply_corrections(words: list, corrections: list[dict]) -> list[dict]:
     return done
 
 
+TAIL_MAX = 1.8  # secondes gardées au plus après le dernier mot (réaction, rire)
+
+
 def trim_window(start: float, end: float, duration: float, words: list,
                 min_len: float = 15.0) -> tuple[float, float] | None:
     """Fenêtre de découpe proposée par l'IA, vérifiée et calée sur les mots.
@@ -150,10 +153,15 @@ def trim_window(start: float, end: float, duration: float, words: list,
     try:
         start, end = float(start), float(end)
     except (TypeError, ValueError):
-        return None
+        start, end = 0.0, duration
     start, end = max(0.0, start), min(duration, end)
     if end - start < min_len:
-        return None
+        start, end = 0.0, duration
+    # Fin qui traîne : plus de TAIL_MAX s sans un mot après la dernière phrase, on coupe
+    # (demande du 16/11 : « des fois l'extrait dure 5 secondes de trop à la fin »).
+    spoken = [w for w in words if start <= w.start < end]
+    if spoken and end - spoken[-1].end > TAIL_MAX and spoken[-1].end + TAIL_MAX - start >= min_len:
+        end = spoken[-1].end + TAIL_MAX
     for w in words:  # mot coupé par le début : on le reprend en entier
         if w.start < start < w.end:
             start = w.start
@@ -168,8 +176,8 @@ def trim_window(start: float, end: float, duration: float, words: list,
         if w.start < end < w.end:
             end = w.end
             break
-    end = min(duration, end + 0.5)
-    if start < 1.0 and duration - end < 2.0:
+    end = min(duration, end + 0.3)
+    if start < 1.0 and duration - end < 1.0:
         return None  # déjà bien coupé
     return start, end
 
@@ -354,6 +362,7 @@ def _budget_stop(rep) -> None:
 
 
 _AUTO_MIN: int | None = None
+MIN_PUBLISH_SCORE = 7  # règle du 16/11 : un clip qui ne dépasse pas 6/10 n'est jamais publié seul
 
 
 def _auto_approve(item, extra: dict, rep, cfg: dict | None = None) -> bool:
@@ -370,9 +379,10 @@ def _auto_approve(item, extra: dict, rep, cfg: dict | None = None) -> bool:
     # Seule compte la note donnée après avoir regardé le clip (images + paroles). Sans elle
     # (IA en panne ou plafond atteint), pas de validation auto : le clip attend une décision.
     pot = meta.get("click_score") if meta.get("kind") != "youtube" else meta.get("potential")
-    if not _AUTO_MIN or not pot or pot < _AUTO_MIN:
+    need = max(_AUTO_MIN or 0, MIN_PUBLISH_SCORE)  # jamais publié sans dépasser 6/10
+    if not _AUTO_MIN or not pot or pot < need:
         if _AUTO_MIN and pot:
-            rep.event(f"Note de clic {pot}/10 sous le seuil {_AUTO_MIN} : laissé en validation "
+            rep.event(f"Note de clic {pot}/10 sous le seuil {need} : laissé en validation "
                       f"manuelle", node="site")
         return False
     from datetime import datetime, timezone
@@ -387,7 +397,7 @@ def _auto_approve(item, extra: dict, rep, cfg: dict | None = None) -> bool:
                   node="site")
         return False
     try:
-        approve(item.name, f"potentiel {pot}/10 ≥ {_AUTO_MIN}")
+        approve(item.name, f"note de clic {pot}/10 ≥ {need}")
     except Exception as e:
         rep.event(f"Validation auto impossible : {e}", node="site", level="warn")
         return False

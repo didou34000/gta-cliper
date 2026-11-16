@@ -131,17 +131,18 @@ export default async function ClipsView({ ctx, status }: { ctx: Ctx; status: "pe
                     <input id={`h-${c.id}`} name="hashtags" defaultValue={c.hashtags.join(" ")} />
                     <details className="transcript"><summary>Transcription</summary><p>{c.transcript || "(aucune parole détectée)"}</p></details>
 
+                    {(pending || c.status === "approved") && c.video_url && (
+                      <button className="btn-publish" name="status" value="publish" title="Programme sur TikTok et YouTube au premier créneau libre, à 6 h au moins des autres posts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg><span>Publier sur TikTok + YouTube</span></button>
+                    )}
                     {pending ? (
                       <div className="actions">
-                        <button className="btn ok" name="status" value="publish" title="Programme sur TikTok et YouTube au premier créneau libre (6 h d'écart avec les autres posts)">Publier</button>
-                        <button className="btn ghost" name="status" value="approved">Valider</button>
+                        <button className="btn ghost" name="status" value="approved" title="Garde le clip dans « À poster » : la publication auto le prendra s'il est noté 7/10 ou plus">Valider</button>
                         <button className="btn ko" name="status" value="rejected" title="Supprime définitivement le clip">Rejeter (supprime)</button>
                       </div>
                     ) : (
                       <>
                         <NetworkLine c={c} />
                         <div className="actions">
-                          {c.status === "approved" && <button className="btn ok" name="status" value="publish" title="Programme sur TikTok et YouTube au premier créneau libre (6 h d'écart avec les autres posts)">Publier</button>}
                           <CopyPost text={post} />
                           {c.video_url && <a className="btn ghost" href={c.video_url} target="_blank" rel="noreferrer">Ouvrir la vidéo</a>}
                         </div>
