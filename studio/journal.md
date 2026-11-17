@@ -5,14 +5,15 @@
 |---|---|---|---|---|---|---|---|---|
 | 13 nov | Carrousel "Justice" | – | 2 474 | 11,9 s | – | 65 | – | engagement 2,75 % |
 | 13 nov | Carrousel Jason/Lucia | – | 1 020 | 9,8 s | – | – | – | engagement 2,55 % |
-| 14 nov | Semer la police (upload manuel, vertical) | 40,5 s | 1 817 | 16,3 s | 40 % | 115 | 9 | MAJ 16 nov 13h |
+| 14 nov | Semer la police (upload manuel, vertical) | 40,5 s | 1 826 | 16,35 s | 40 % | 115 | 9 | MAJ 17 nov 12h10 (stable) |
 | 14 nov | Semer la police (2e copie) | 45,6 s | 638 | 11,3 s | 25 % | – | – | doublon, faible |
-| 15 nov 13h | Faire le plein v3 (upload manuel, vertical) | 44 s | 3 836 | 16,7 s | 38 % | 327 | 16 | MAJ 16 nov 13h : MEILLEURE vidéo du compte (vues, likes 8,5 %, 7 commentaires, 16 partages) |
+| 15 nov 13h | Faire le plein v3 (upload manuel, vertical) | 44 s | 4 067 | 16,1 s | 37 % | 331 | 17 | MAJ 16 nov 13h : MEILLEURE vidéo du compte (vues, likes 8,5 %, 7 commentaires, 16 partages) |
 | 13 nov | Carrousel "Faire le plein" (station-essence) | – | 1 191 | 14,5 s | – | 24 | 1 | engagement 2,15 % ; meilleur temps moyen des carrousels niche |
-| 15 nov 21h27 | Voler une voiture (PAYSAGE, HUD) | 47,6 s | 1 365 | 13,9 s | 29 % | 107 | 6 | MAJ 16 nov 13h (~16 h après publication) : likes 7,8 %, 0 commentaire ; rétention la plus basse des vidéos voix-off ; Short YouTube 0 vue |
-| 16 nov 12h30 | Carrousel "Braquer un magasin" (notif) | – | en cours | | | | | post Buffer 6afa475c06e1675856b430ab envoyé en notif à 12h30 ; publication par le propriétaire pas encore visible dans Buffer à 16h54 |
-| 16 nov 18h30 | Braquer un magasin (paysage, HUD, voix ElevenLabs Tom) | 42,5 s | en cours | | | | | voix refaite en ElevenLabs à 10h (1re version Chatterbox jamais publiée) ; TikTok 6afac46a60a910801c7f0923, Short 6afac46b06e1675856db9b02 ; publiée 18h33, métriques pas encore lues par Buffer au 17 nov 1h |
-| 17 nov 12h30 | Carrousel "Ton perso change de corps" (notif) | – | à venir | | | | | Buffer 6afb9b00df36f4d825584c1e |
+| 15 nov 21h27 | Voler une voiture (PAYSAGE, HUD) | 47,6 s | 1 473 | 13,6 s | 29 % | 111 | 6 | MAJ 16 nov 13h (~16 h après publication) : likes 7,8 %, 0 commentaire ; rétention la plus basse des vidéos voix-off ; Short YouTube 0 vue |
+| 16 nov 12h30 | Carrousel "Braquer un magasin" (notif) | – | ? | | | | | notif envoyée 12h30 ; AUCUNE copie "via network" 28 h plus tard (17 nov 16h54) → très probablement jamais publié par le propriétaire |
+| 16 nov 18h30 | Braquer un magasin (paysage, HUD, voix ElevenLabs Tom) | 42,5 s | 827 | 14,1 s | 33 % | 59 | 0 | MAJ 17 nov 12h10 (~17 h) : likes 7,1 %, 0 commentaire, 0 partage ; Short YouTube 9 vues, 1 like | voix refaite en ElevenLabs à 10h (1re version Chatterbox jamais publiée) ; TikTok 6afac46a60a910801c7f0923, Short 6afac46b06e1675856db9b02 ; publiée 18h33, métriques pas encore lues par Buffer au 17 nov 1h |
+| 17 nov 12h30 | Carrousel "Ton perso change de corps" (notif) | – | en cours | | | | | Buffer 6afb9b00df36f4d825584c1e, notif envoyée 12h30 ; pas encore de copie "via network" à 16h54 |
+| 16 nov 22h23 | (clipper) Ruruissime saut, GTA 5 | 18,1 s | 675 | 8,2 s | 45 % | 10 | 0 | pas un post de la boucle ; likes 1,5 % seulement ; légende avec "Abonne-toi" |
 | 17 nov 18h30 | Ton perso change de corps (VERTICAL plein écran, HUD verre néon, voix ElevenLabs Tom) | 33,4 s | à venir | | | | | 1re vidéo verticale de la boucle + la plus courte ; TikTok 6afb9cc885dca6b14a0c39e0, Short 6afb9ccaf83aaca8f3995fb9 |
 
 ## Ce qui marche (constaté)
@@ -61,10 +62,27 @@
 - Production du mardi déjà complète (passage de 0h55) : carrousel "corps" en notif 12h30 et vidéo verticale 18h30 TikTok + Short, toujours programmés, fichiers vérifiés en ligne (HTTP 200, vidéo 23,6 Mo). Rien refait.
 - Hypothèses inchangées (pas de nouvelles données).
 
+## Analyse du 17 nov 16h54 (stats Buffer TikTok relues le 17 nov à 12h10 Paris, YouTube à 15h44)
+- "Braquer un magasin" (2e vidéo PAYSAGE) à ~17 h : 827 vues, 14,1 s de temps moyen sur 42,5 s = 33 % de rétention, 59 likes (7,1 %), 0 partage, 0 commentaire. À âge égal, "Voler une voiture" (paysage aussi) était à 1 365 vues : braquage fait 40 % de vues en moins.
+- Verdict paysage : 2 mesures sur 2 sous le vertical (29 % et 33 % contre 37-40 % pour "Faire le plein" et "Semer la police", soit ~31 % contre ~38,5 % en moyenne). Le seuil fixé (< 32 %) n'est pas franchi de justesse par braquage, mais l'écart va toujours dans le même sens : on reste en VERTICAL pour de bon (déjà le cas depuis mardi). Avec 2 points chacun, ça reste fragile statistiquement ; c'est la tendance, pas une preuve.
+- Ce qui a péché sur braquage, honnêtement : (1) le format paysage (image petite, HUD illisible sur téléphone) ; (2) 0 partage et 0 commentaire, alors que "Semer la police" et "Faire le plein" en ont 9 et 17 : un braquage de supérette est moins "astuce à envoyer à un pote" ; (3) moins de vues dès le départ : le compte a reçu 2 clips GTA 5 du clipper le même soir (18h54 et 22h23), ce qui a pu diluer l'audience. Impossible de séparer ces causes avec ces volumes.
+- Les likes restent bons partout (7-9 % sur les vidéos voix-off) : le contenu plaît, c'est la rétention et le partage qui bloquent la croissance.
+- Les anciennes vidéos s'essoufflent normalement : "Faire le plein" 3 836 → 4 067 vues et son temps moyen baisse un peu (16,7 → 16,1 s, 37 %) à mesure qu'elle sort du noyau d'abonnés.
+- Clipper sur le même compte : le clip Ruruissime (GTA 5, 18 s) fait 675 vues et 45 % de rétention, mais seulement 1,5 % de likes (contre 7-9 % pour nos vidéos niche) et sa légende contient "Abonne-toi" (interdit dans la boucle, mais c'est le clipper). Le clip Michou n'a pas de stats lues (0). Ça confirme que les deux formats ne parlent pas au même public ; à signaler au propriétaire.
+- Carrousels : "Braquer un magasin" toujours absent en "via network" 28 h après la notif → considéré comme NON publié. "Corps" envoyé en notif à 12h30 aujourd'hui, pas encore visible. Si le propriétaire ne publie pas les carrousels notifiés, ils ne servent à rien : à lui demander.
+- YouTube Shorts : toujours quasi nuls (braquage 9 vues, voler voiture 1, clips clipper 3-7). Rien à conclure.
+- Production du mardi : déjà complète (passage de 0h55). Vidéo "corps" (vertical, 33,4 s) toujours programmée 18h30 TikTok + Short, fichier en ligne (HTTP 200, 23,6 Mo). Rien refait.
+
+### Décisions pour mercredi 18 (passage de 0h54)
+1. Garder VERTICAL plein écran + ≤ 35 s (le résultat de "corps" ne sera lisible qu'au passage de mercredi 16h54 : ne pas changer ces 2 variables avant).
+2. Sujet : viser le PARTAGE (seule métrique qui manque). Les vidéos les plus partagées sont des "astuces qui changent ta façon de jouer contre la police" (semer la police 9, faire le plein 17). Piste n°1 : "faire baisser son niveau de recherche" (changer de vêtements, jeter l'arme, fouille, chiens K9, herses) — à condition de vérifier qu'elle ne recoupe pas "Semer la police" du 14 nov (lire son script avant ; si trop proche, prendre "Scooter Bros : faire venir ta voiture et tes armes" ou "profil criminel : visage, vêtements, véhicule mémorisés", en évitant les sujets déjà dans "5 choses").
+3. Une seule variable nouvelle pour mercredi : la fin. Finir sur une question fermée liée au sujet affichée à l'écran (ex. "Toi tu changes de tenue ou tu fonces ?") sans appel à commenter/liker, pour tester commentaires et partages.
+
 ## Hypothèses à tester (une ou deux à la fois)
 1. Vidéo plus courte (30-35 s) → rétention plus haute ?
 2. Chiffre ou image choc dès 0,5 s, et annoncer la meilleure étape ("la 5e est la pire").
-3. Paysage vs vertical : 1er résultat (16 nov) = paysage 29 % vs vertical 38-40 %. 2e mesure avec "Braquer un magasin" (paysage, 16 nov 18h30). Mardi = vertical.
+3. Paysage vs vertical : TRANCHÉ (17 nov) = paysage 29 % et 33 % vs vertical 37-40 %. Vertical définitif.
+4. Fin sur une question fermée à l'écran → plus de commentaires/partages ? (à tester mercredi)
 
 ## Idées de sujets (niche, sourcées previews sept. 2026)
 - 4 armes max + le reste dans le coffre de la voiture.
@@ -102,6 +120,7 @@
 - 17 nov 1h : le compte ElevenLabs affiche maintenant le plan CREATOR (123 370 crédits/mois, nouveau cycle jusqu'au 16 déc 18h59) : changement fait côté propriétaire, pas par la boucle. Voix du 17 nov = 587 crédits (1 prise, 32 s). Reste 120 649 crédits. Le budget n'est plus le facteur limitant ; la règle "1 vidéo/jour" du plan reste.
 
 - 17 nov 8h55 : 120 649 crédits restants (2 721 / 123 370), inchangé.
+- 17 nov 16h54 : 118 261 crédits restants (5 109 / 123 370) ; ~2 400 crédits consommés depuis 8h55 par un autre fil (pas la boucle). Large marge.
 
 ## Dernière vidéo
 - 2026-11-17 18:30 (Paris, programmée) : Ton perso change de corps. Avant : 2026-11-16 18:30 Braquer un magasin. Avant : 2026-11-15 21:27 Voler une voiture.
@@ -122,3 +141,4 @@
 - 2026-11-16 16h54 : analyse avec stats fraîches (13h09). Production du lundi déjà complète (carrousel envoyé 12h30, vidéo + Short programmés 18h30) : rien refait. Décision : vidéo de mardi en vertical, ≤ 40 s.
 - 2026-11-17 0h55-1h20 : analyse (pas de stats neuves) + production complète du mardi : carrousel "corps" programmé en notif 12h30, vidéo verticale 33,4 s programmée 18h30 TikTok + Short. Plans tirés des trailers 1 et 2 (dont développé couché sur la plage, t2 38,4 s) + captures gematsu, planche de vérif regardée. Hébergement sur la branche claude/project-thread-1tu61p (branche de ce passage). Scripts : /mnt/project-files/videos-gta6/corps/ (make_corps.py = modèle VERTICAL réutilisable, shots.json, mix_corps.py).
 - 2026-11-17 8h55 : analyse seulement (pas de stats neuves, dernière lecture Buffer 16 nov 13h09). Production du mardi déjà faite : rien refait. Carrousel braquage du 16 nov toujours absent en "via network" : signalé.
+- 2026-11-17 16h54 : analyse avec stats fraîches (TikTok 12h10, YouTube 15h44). Braquage paysage = 33 % : paysage abandonné pour de bon. Carrousel braquage considéré non publié. Production du mardi déjà faite : rien refait. Pistes mercredi notées (sujet orienté partage, fin en question fermée).
