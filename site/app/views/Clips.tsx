@@ -132,7 +132,7 @@ export default async function ClipsView({ ctx, status }: { ctx: Ctx; status: "pe
                     <details className="transcript"><summary>Transcription</summary><p>{c.transcript || "(aucune parole détectée)"}</p></details>
 
                     {(pending || c.status === "approved") && c.video_url && (
-                      <button className="btn-publish" name="status" value="publish" title="Programme sur TikTok et YouTube au premier créneau libre, à 1 h 30 au moins des autres posts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg><span>Publier sur TikTok + YouTube</span></button>
+                      <button className="btn-publish" name="status" value="publish" title="Programme sur TikTok et YouTube au premier créneau libre, en respectant l'écart réglé entre deux posts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg><span>Publier sur TikTok + YouTube</span></button>
                     )}
                     {pending ? (
                       <div className="actions">

@@ -150,7 +150,6 @@ export async function bufferDues(): Promise<number[] | null> {
   }
 }
 
-const MANUAL_GAP_MS = 90 * 60_000; // bouton « Publier » : 1 h 30 au moins entre deux posts (règle du 16/11)
 
 /** Premier créneau autorisé (jours/heures de publication) à au moins `gap` de tout post prévu. */
 function freeSlot(from: number, busy: number[], gap: number, days: number[], start: number, end: number): Date {
@@ -172,7 +171,9 @@ export async function publishOne(id: string): Promise<{ ok: boolean; message: st
   if (!c || !c.video_url) return { ok: false, message: "Clip ou vidéo introuvable" };
   if (!external) return { ok: false, message: "Impossible de lire les posts déjà prévus dans Buffer : rien n'a été programmé, réessaie dans une minute" };
   const busy = [...new Set([...external, ...clips.flatMap(dues)])];
-  const due = freeSlot(Date.now() + FIRST_DELAY_MS, busy, MANUAL_GAP_MS, schedule.pub_days, schedule.pub_from, schedule.pub_to);
+  // Même écart que la publication auto (réglage « un post toutes les N min » ; 30 min = 2 posts/h max).
+  const gap = Math.max(10, schedule.publish_every_min || 90) * 60_000;
+  const due = freeSlot(Date.now() + FIRST_DELAY_MS, busy, gap, schedule.pub_days, schedule.pub_from, schedule.pub_to);
   const nets = NETS.filter((n) => !schedule.nets?.length || schedule.nets.includes(n));
   const networks: Networks = { ...(c.networks ?? {}) };
   for (const net of nets) {
@@ -264,7 +265,6 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
 
   // 2) Toujours un clip d'avance : s'il n'y en a pas, on programme le meilleur au prochain créneau.
   const allDues = [...new Set([...clips.flatMap(dues), ...external])];
-  let last = allDues.length ? Math.max(...allDues.filter((d) => d <= now + 30 * 24 * 3600_000)) : 0;
   const perDay = new Map<string, number>(); // posts déjà prévus par jour (heure de Paris)
   for (const c of clips) {
     const d = dues(c);
@@ -282,10 +282,12 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
   const inBuffer = clips.filter((c) => dues(c).some((d) => d > now)).length;
   for (const c of todo) {
     if (inFlight >= AUTO_AHEAD || inBuffer + sent >= MAX_SCHEDULED) break;
-    const due = slot(Math.max(now + FIRST_DELAY_MS, last + every));
+    // Premier créneau libre à au moins `every` de TOUT post (passé ou à venir, vidéos niches
+    // comprises) : un post prévu ce soir ne bloque plus les clips de l'après-midi.
+    const due = freeSlot(+slot(now + FIRST_DELAY_MS), allDues, every, schedule.pub_days, schedule.pub_from, schedule.pub_to);
     if (+due - now > 7 * 24 * 3600_000) break; // rien d'autorisé dans les 7 jours : on attend
     if (await schedTo(c, due)) {
-      sent++; inFlight++; last = +due;
+      sent++; inFlight++; allDues.push(+due);
       const k = parisClock(due).date; perDay.set(k, (perDay.get(k) ?? 0) + 1);
     }
   }
