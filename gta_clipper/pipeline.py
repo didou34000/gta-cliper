@@ -377,6 +377,7 @@ def run(cfg: dict, skip_llm: bool = False, chat_dir: str | None = None) -> list[
         "game": cfg["game_name"] if cfg.get("game_filter", True) else "tous les jeux",
         "top": top_n, "max_clips": int(os.environ.get("MAX_CLIPS") or 0) or None,
         "min_views": cfg.get("min_clip_views"), "hours": cfg.get("lookback_hours"),
+        "lang": cfg.get("stream_language", "fr"),
     }
     _budget_stop(rep)
     try:
