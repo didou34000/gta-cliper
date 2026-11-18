@@ -120,7 +120,7 @@ async function unschedule(id: string): Promise<boolean> {
 const GTA_RE = /\bgta\b|gta ?(6|vi)\b|grand theft auto/i;
 // Programmation sur GTA VI : on ne publie que des clips GTA VI (pas le stock GTA V).
 const GTA6_RE = /grand theft auto vi\b|gta\s*(6|vi)\b/i;
-const matchesGame = (c: Clip, game?: string) => !game || !/\bvi$/i.test(game.trim()) || GTA6_RE.test([c.game, c.title, ...(c.hashtags ?? [])].join(" "));
+const matchesGame = (c: Clip, game?: string) => !game || !/\bvi$/i.test(game.trim()) || GTA6_RE.test([(c as unknown as { game?: string }).game ?? "", c.title, ...(c.hashtags ?? [])].join(" "));
 export const isGtaClip = (c: Clip) => GTA_RE.test([c.title, c.description, ...(c.hashtags ?? [])].join(" "));
 
 // Posts déjà programmés dans Buffer sur nos comptes, y compris ceux qui ne viennent pas du
