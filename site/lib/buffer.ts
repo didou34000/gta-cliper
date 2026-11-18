@@ -215,7 +215,7 @@ const dues = (c: Clip) =>
 // prend sa place au même horaire ; l'ancien repasse dans « À poster » (il repartira plus tard
 // s'il reste le meilleur). Les clips programmés à la main (bouton « Publier ») ne sont jamais
 // remplacés.
-const AUTO_AHEAD = 3; // 18/11 : 3 clips d'avance (un toutes les 10 min sans trou entre deux passages)
+const AUTO_AHEAD = 1; // 18/11 13h30 : un post toutes les 2 h, un seul clip d'avance (remplacé par un plus vu)
 const SWAP_MIN_LEAD_MS = 10 * 60_000; // on ne touche plus à un post qui part dans moins de 10 min
 
 /** Envoie à Buffer les clips validés : le meilleur d'abord, un seul d'avance, remplacé si mieux. */
@@ -233,7 +233,8 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
     .filter((c) => c.status === "approved" && c.video_url && isGtaClip(c) && matchesGame(c, schedule.game) && matchesLang(c, schedule.lang) && (c.potential ?? 0) >= minScore(schedule.auto_min))
     .filter((c) => !Object.values(c.networks ?? {}).some((n) => n?.state === "error" && now - +new Date(n.at) < RETRY_AFTER_MS))
     // Le meilleur clip d'abord (note de clic), à égalité le plus récent (plus frais).
-    .sort((a, b) => (b.potential ?? 0) - (a.potential ?? 0) || (b.decided_at ?? "").localeCompare(a.decided_at ?? ""));
+    // 18/11 (règle utilisateur) : le clip le plus vu d'abord, à égalité le plus récent.
+    .sort((a, b) => (b.views ?? 0) - (a.views ?? 0) || (b.decided_at ?? "").localeCompare(a.decided_at ?? ""));
 
   const schedTo = async (c: Clip, due: Date) => {
     const networks: Networks = { ...(c.networks ?? {}) };
@@ -260,9 +261,9 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
   let sent = 0, swapped = 0;
 
   // 1) Remplacement : un clip validé mieux noté prend la place d'un clip auto pas encore parti.
-  for (const old of [...ahead].sort((a, b) => (a.potential ?? 0) - (b.potential ?? 0))) {
+  for (const old of [...ahead].sort((a, b) => (a.views ?? 0) - (b.views ?? 0))) {
     const best = todo[0];
-    if (!best || (best.potential ?? 0) <= (old.potential ?? 0)) break;
+    if (!best || (best.views ?? 0) <= (old.views ?? 0)) break;
     const due = Math.min(...dues(old).filter((d) => d > now));
     if (due - now < SWAP_MIN_LEAD_MS) continue;
     const ids = Object.values(old.networks ?? {}).filter((n) => n?.state === "scheduled" && n.id).map((n) => n!.id!);
