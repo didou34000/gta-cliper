@@ -178,7 +178,11 @@ function freeSlot(from: number, busy: number[], gap: number, days: number[], sta
 // Paris (16:00 UTC). Ces créneaux restent libres pour les clips, même avant d'être dans Buffer.
 const RECAP_FROM = Date.UTC(2026, 10, 18, 16, 0);
 const RECAP_EVERY = 3 * 3600_000;
+// 18/11 16h20 : les récaps partent désormais dès qu'elles sont prêtes (TikTok seul) : plus de
+// créneau réservé. Repasser à true pour réserver de nouveau un créneau toutes les 3 h.
+const RECAP_RESERVE = false;
 function recapSlots(now: number): number[] {
+  if (!RECAP_RESERVE) return [];
   const out: number[] = [];
   const first = Math.max(RECAP_FROM, RECAP_FROM + Math.floor((now - RECAP_FROM) / RECAP_EVERY) * RECAP_EVERY);
   for (let t = first; t < now + 8 * 24 * 3600_000; t += RECAP_EVERY) out.push(t);
