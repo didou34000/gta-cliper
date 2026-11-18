@@ -8,6 +8,7 @@ on:
       jeu: { description: "Jeu Twitch (ex. Grand Theft Auto VI, ou « tous »)", default: "" }
       every_min: { description: "Un passage toutes les N min (10 à 360)", default: "" }
       max_clips: { description: "Clips max par passage (1 à 10)", default: "" }
+      top: { description: "Nombre de streamers suivis (1 à 20)", default: "" }
       min_views: { description: "Vues minimum d'un clip", default: "" }
       heures: { description: "Fenêtre en heures (1 à 720)", default: "" }
       auto_min: { description: "Validation auto si potentiel ≥ N/10 (0 = jamais)", default: "" }
@@ -33,6 +34,7 @@ jobs:
           SET_LANGUE: ${{ inputs.langue }}
           SET_EVERY_MIN: ${{ inputs.every_min }}
           SET_MAX_CLIPS: ${{ inputs.max_clips }}
+          SET_TOP: ${{ inputs.top }}
           SET_MIN_VIEWS: ${{ inputs.min_views }}
           SET_HOURS: ${{ inputs.heures }}
           SET_AUTO_MIN: ${{ inputs.auto_min }}
