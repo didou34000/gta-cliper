@@ -252,7 +252,7 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
             meta = {**m, "hook": m.get("hook") or meta["hook"], "corrections": fixes}
             # Note finale par Sonnet (règle du 16/11 : Haiku est trop généreux), avec plus
             # d'images et les vues Twitch. Seulement si Haiku met 6 ou plus : en dessous le clip
-            # ne sera de toute façon pas publié (et ça garde le passage sous 1 $/jour).
+            # ne sera de toute façon pas publié (et ça garde le passage sous le plafond du jour).
             if (meta.get("click_score") or 0) >= 6:
                 try:
                     from .metadata import judge_click

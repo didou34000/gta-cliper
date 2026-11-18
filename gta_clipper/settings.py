@@ -16,7 +16,7 @@ from . import s3lite
 DEFAULTS = {"enabled": False, "every_min": 30, "game": "Grand Theft Auto VI", "top": 8,
             "max_clips": 3, "min_views": 200, "hours": 48, "publish_every_min": 120,
             "auto_min": 7}
-INTS = {"every_min": (20, 360), "top": (1, 20), "max_clips": (1, 10), "min_views": (0, 100000),
+INTS = {"every_min": (10, 360), "top": (1, 20), "max_clips": (1, 10), "min_views": (0, 100000),
         "hours": (1, 720), "publish_every_min": (10, 720), "auto_min": (0, 10)}
 ON = ("on", "oui", "1", "true", "allumer", "allumée", "allume")
 OFF = ("off", "non", "0", "false", "couper", "coupée", "coupe")

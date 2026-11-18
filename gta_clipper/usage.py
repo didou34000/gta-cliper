@@ -109,9 +109,9 @@ def llm(model: str, resp) -> None:
 # --- Plafond de dépense Claude par jour (demande du 15/11 : jamais plus de 1 € par jour) ----
 # Les compteurs locaux disparaissent avec chaque machine GitHub : le total du jour est donc
 # relu dans le registre du mois sur R2 (somme des passages déjà finis aujourd'hui, heure de
-# Paris), plus ce que le passage en cours a déjà dépensé. Par prudence, 1 $ compte pour 1 €
+# Paris), plus ce que le passage en cours a déjà dépensé. Plafond : 2 $/jour (choix du 18/11). Par prudence, 1 $ compte pour 1 €
 # (1 $ vaut moins de 1 €), donc la limite réelle est un peu sous 1 €.
-DAILY_LLM_USD = float(os.environ.get("LLM_MAX_USD_DAY") or 1.0)
+DAILY_LLM_USD = float(os.environ.get("LLM_MAX_USD_DAY") or 2.0)
 _TODAY: dict | None = None
 
 
