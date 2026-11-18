@@ -408,7 +408,7 @@ def _budget_stop(rep) -> None:
 
 
 _AUTO_MIN: int | None = None
-MIN_PUBLISH_SCORE = 5  # plancher absolu ; le seuil réel est auto_min (7 par défaut, règle du 16/11)
+MIN_PUBLISH_SCORE = 1  # plancher absolu ; le seuil réel est auto_min (7 par défaut, règle du 16/11)
 
 
 def _auto_approve(item, extra: dict, rep, cfg: dict | None = None) -> bool:
@@ -425,7 +425,7 @@ def _auto_approve(item, extra: dict, rep, cfg: dict | None = None) -> bool:
     # Seule compte la note donnée après avoir regardé le clip (images + paroles). Sans elle
     # (IA en panne ou plafond atteint), pas de validation auto : le clip attend une décision.
     pot = meta.get("click_score") if meta.get("kind") != "youtube" else meta.get("potential")
-    need = max(_AUTO_MIN or 0, MIN_PUBLISH_SCORE)  # seuil réglé (auto_min), jamais sous 5/10
+    need = max(_AUTO_MIN or 0, MIN_PUBLISH_SCORE)  # seuil réglé (auto_min), jamais sous 1/10
     if not _AUTO_MIN or not pot or pot < need:
         if _AUTO_MIN and pot:
             rep.event(f"Note de clic {pot}/10 sous le seuil {need} : laissé en validation "

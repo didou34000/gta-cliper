@@ -192,8 +192,8 @@ export async function publishOne(id: string): Promise<{ ok: boolean; message: st
 // Règle du 16/11 : un clip qui ne dépasse pas 6/10 ne part jamais tout seul (il reste dans
 // « À poster » ; le bouton « Publier » reste possible, c'est alors un choix fait à la main).
 export const MIN_SCORE = 7;
-// Seuil réel : auto_min de la Programmation (7 par défaut), jamais sous 5.
-const minScore = (auto?: number) => Math.max(5, auto || MIN_SCORE);
+// Seuil réel : auto_min de la Programmation (7 par défaut), jamais sous 1.
+const minScore = (auto?: number) => Math.max(1, auto || MIN_SCORE);
 
 const dues = (c: Clip) =>
   Object.values(c.networks ?? {}).filter((n) => n?.state === "scheduled" && n.due).map((n) => +new Date(n!.due!));
