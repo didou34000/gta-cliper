@@ -86,8 +86,8 @@ def every_at(cfg: dict, now: datetime) -> int:
     p = _paris(now)
     peak = int(cfg.get("peak_every_min") or 0)
     if peak and in_window(p.hour + p.minute / 60, int(cfg.get("peak_from", 18)), int(cfg.get("peak_to", 24))):
-        return max(20, peak)
-    return max(20, int(cfg.get("every_min", 30)))
+        return max(10, peak)
+    return max(10, int(cfg.get("every_min", 30)))
 
 
 def decide(cfg: dict | None, last: datetime | None, now: datetime) -> tuple[bool, str]:

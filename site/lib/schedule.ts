@@ -6,7 +6,7 @@ import { getJsonKey, putObject, r2Configured } from "./r2";
 
 export type Schedule = {
   enabled: boolean;
-  every_min: number;          // un passage toutes les N minutes (20 min minimum)
+  every_min: number;          // un passage toutes les N minutes (10 min minimum)
   game: string;               // nom exact Twitch, ou « tous »
   top: number;                // N plus gros streamers FR du jeu
   max_clips: number;          // clips max par passage
@@ -36,7 +36,7 @@ export const DEFAULT_SCHEDULE: Schedule = {
   pub_days: [0, 1, 2, 3, 4, 5, 6], pub_from: 8, pub_to: 24, pub_max_day: 0, nets: ["tiktok", "youtube"], lang: "fr",
 };
 
-export const EVERY_OPTIONS = [20, 30, 45, 60, 90, 120, 180, 240, 360];
+export const EVERY_OPTIONS = [10, 20, 30, 45, 60, 90, 120, 180, 240, 360];
 export const PUBLISH_OPTIONS = [10, 20, 30, 45, 60, 90, 120, 180, 240, 360, 720];
 export const TOP_OPTIONS = [3, 5, 8, 10, 15, 20];
 export const HOUR_OPTIONS = Array.from({ length: 25 }, (_, i) => i); // 0 … 24

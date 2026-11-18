@@ -6,7 +6,7 @@ on:
       programmation: { description: "Programmation : on / off (vide = inchangé)", default: "" }
       langue: { description: "Langue des streamers : fr, en, es, pt, de, it, ja, ko, any", default: "" }
       jeu: { description: "Jeu Twitch (ex. Grand Theft Auto VI, ou « tous »)", default: "" }
-      every_min: { description: "Un passage toutes les N min (20 à 360)", default: "" }
+      every_min: { description: "Un passage toutes les N min (10 à 360)", default: "" }
       max_clips: { description: "Clips max par passage (1 à 10)", default: "" }
       min_views: { description: "Vues minimum d'un clip", default: "" }
       heures: { description: "Fenêtre en heures (1 à 720)", default: "" }
