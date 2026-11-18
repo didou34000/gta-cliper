@@ -14,7 +14,9 @@
 | 16 nov 18h30 | Braquer un magasin (paysage, HUD, voix ElevenLabs Tom) | 42,5 s | 827 | 14,1 s | 33 % | 59 | 0 | MAJ 17 nov 12h10 (~17 h) : likes 7,1 %, 0 commentaire, 0 partage ; Short YouTube 9 vues, 1 like | voix refaite en ElevenLabs à 10h (1re version Chatterbox jamais publiée) ; TikTok 6afac46a60a910801c7f0923, Short 6afac46b06e1675856db9b02 ; publiée 18h33, métriques pas encore lues par Buffer au 17 nov 1h |
 | 17 nov 12h30 | Carrousel "Ton perso change de corps" (notif) | – | en cours | | | | | Buffer 6afb9b00df36f4d825584c1e, notif envoyée 12h30 ; pas encore de copie "via network" à 16h54 |
 | 16 nov 22h23 | (clipper) Ruruissime saut, GTA 5 | 18,1 s | 675 | 8,2 s | 45 % | 10 | 0 | pas un post de la boucle ; likes 1,5 % seulement ; légende avec "Abonne-toi" |
-| 17 nov 18h30 | Ton perso change de corps (VERTICAL plein écran, HUD verre néon, voix ElevenLabs Tom) | 33,4 s | à venir | | | | | 1re vidéo verticale de la boucle + la plus courte ; TikTok 6afb9cc885dca6b14a0c39e0, Short 6afb9ccaf83aaca8f3995fb9 |
+| 17 nov 18h30 | Ton perso change de corps (VERTICAL plein écran, HUD verre néon, voix ElevenLabs Tom) | 33,4 s | en cours (publiée 18h30, métriques pas encore lues) | | | | | 1re vidéo verticale de la boucle + la plus courte ; TikTok 6afb9cc885dca6b14a0c39e0, Short 6afb9ccaf83aaca8f3995fb9 |
+| 18 nov 12h30 | Carrousel "Profil criminel" (notif) | – | à venir | | | | | Buffer 6afceb999f3765f6ab1b4d16 ; fin = question fermée « Toi, tu finis pro ou psycho ? » (pas de slide « like & abonne-toi ») |
+| 18 nov 18h30 | Profil criminel (VERTICAL plein écran, voix ElevenLabs Tom, fin en question fermée) | 34,5 s | à venir | | | | | TikTok 6afceba5bb12698d15844acc, Short 6afceba693fa11d37df36e70 ; variable testée : la fin (question à l'écran) |
 
 ## Ce qui marche (constaté)
 - Format 5 étapes + "tac" + sous-titres mot à mot + titres dégradé GTA : "Faire le plein" a fait le meilleur taux de likes.
@@ -78,6 +80,26 @@
 2. Sujet : viser le PARTAGE (seule métrique qui manque). Les vidéos les plus partagées sont des "astuces qui changent ta façon de jouer contre la police" (semer la police 9, faire le plein 17). Piste n°1 : "faire baisser son niveau de recherche" (changer de vêtements, jeter l'arme, fouille, chiens K9, herses) — à condition de vérifier qu'elle ne recoupe pas "Semer la police" du 14 nov (lire son script avant ; si trop proche, prendre "Scooter Bros : faire venir ta voiture et tes armes" ou "profil criminel : visage, vêtements, véhicule mémorisés", en évitant les sujets déjà dans "5 choses").
 3. Une seule variable nouvelle pour mercredi : la fin. Finir sur une question fermée liée au sujet affichée à l'écran (ex. "Toi tu changes de tenue ou tu fonces ?") sans appel à commenter/liker, pour tester commentaires et partages.
 
+## Analyse du 18 nov 0h55
+- Pas de stats neuves : la dernière lecture Buffer des métriques TikTok date toujours du 17 nov 12h10. La vidéo « corps » (publiée 17 nov 18h30, 1re verticale courte de la boucle) n'a pas encore de chiffres : jugeable au passage de 16h54 (Buffer relit vers 12-13h).
+- Carrousel « corps » (notif 17 nov 12h30) : pas de copie « via network » visible 12 h après. Comme pour le braquage, ça ressemble à un carrousel jamais publié par le propriétaire. Si aucun des carrousels notifiés n'est publié, ils ne servent à rien : question à lui poser (déjà signalé).
+- Aucun post programmé dans Buffer avant ce passage (le clipper n'avait rien en attente) : limite des 10 posts sans souci.
+- Rien à conclure de plus sans données ; hypothèses inchangées.
+
+### Production du mercredi 18 (ce passage)
+- Sujet : le PROFIL CRIMINEL (remplace l'honneur de RDR2, note la violence inutile, 4 niveaux Professionnel/Agressif/Violent/Psychopathe, Jason et Lucia séparés, état « brisé » irréversible). Pas de recoupement avec « Semer la police » (témoins, étoiles creuses, radar, masque, relooking) ni « 5 choses ». Choisi parce que la piste « baisser son niveau de recherche » recoupait trop « Semer la police » (masque + relooking déjà dedans).
+- Sources : PC Gamer 7 sept. 2026 (preview TGG + IGN, citation Rob Nelson), tbreak 2 sept. 2026 (citation Nelson via Complex : « une mesure du comportement inutile », riposter vs caissier sans défense, état brisé = le jeu arrête de noter), récap GTABase 31 août 2026.
+- Variables : VERTICAL + ~34 s gardés (pas encore de verdict sur « corps »). UNE nouvelle variable : la fin en question fermée à l'écran (« Toi, tu finis pro ou psycho ? »), sans appel à liker/commenter. Le carrousel finit aussi sur cette question au lieu de la slide « like & abonne-toi ».
+- Plans : détection des coupes faite ; 2 plans écartés car bandeau Weazel News (t1 63,6 et t1 66,7 : « NO (OVER) TURNING », « DIRT-BIKE ») → remplacés par t2 45,3 (police de nuit) et t2 120,75 (pick-up de nuit). Planche de vérif + 10 images de la vidéo finale regardées. Je ne peux pas écouter : niveau audio vérifié par mesure (moyenne −16,3 dB, crête −1,1 dB).
+- Voix : 1 prise, 510 crédits, 33,3 s. Timings mot à mot via faster-whisper local.
+
+## Analyse du 18 nov 8h55
+- Pas de stats neuves : dernière lecture Buffer des métriques TikTok toujours le 17 nov 12h10 (YouTube 15h44). La vidéo « corps » (17 nov 18h30, 1re verticale courte, 33,4 s) affiche encore 0 car lue seulement à la publication : son verdict (rétention vertical court vs 38-40 %) arrive au passage de 16h54, dernier de la boucle.
+- Carrousel « corps » (notif 17 nov 12h30) : toujours aucune copie « via network » ~20 h après. 2 carrousels notifiés sur 2 jamais remontés : très probablement pas publiés par le propriétaire. Le carrousel « profil » part en notif aujourd'hui 12h30 : même risque.
+- Le clipper n'a plus rien posté sur ces chaînes depuis le 16 nov 22h23 (Ruruissime) : la vidéo de ce soir ne sera pas diluée par un clip GTA 5 le même soir, sauf nouveau post.
+- Production du mercredi déjà complète (passage de 0h55) : carrousel notif 12h30 + vidéo 18h30 TikTok + Short toujours programmés, fichiers en ligne (HTTP 200). Rien refait.
+- Hypothèses inchangées faute de données.
+
 ## Hypothèses à tester (une ou deux à la fois)
 1. Vidéo plus courte (30-35 s) → rétention plus haute ?
 2. Chiffre ou image choc dès 0,5 s, et annoncer la meilleure étape ("la 5e est la pire").
@@ -88,7 +110,7 @@
 - 4 armes max + le reste dans le coffre de la voiture.
 - Argent perdu quand on meurt / retrait au distributeur.
 - (déjà faits : semer la police, faire le plein, voler une voiture, braquer un magasin [16 nov], corps/poids/muscle/sommeil [17 nov])
-- Pistes mercredi (sourcées previews) : baisser son niveau de recherche (changer de vêtements, jeter son arme, la police fouille, chiens K9, herses) ; cacher un corps / se cacher dans un coffre ; appli Scooter Bros (faire venir sa voiture + armes dans le coffre) ; caisses de station-service à vider billet par billet.
+- (fait 18 nov : profil criminel) Pistes (sourcées previews) : baisser son niveau de recherche (changer de vêtements, jeter son arme, la police fouille, chiens K9, herses) ; cacher un corps / se cacher dans un coffre ; appli Scooter Bros (faire venir sa voiture + armes dans le coffre) ; caisses de station-service à vider billet par billet.
 - Cash perdu à la mort / arrêté → dépôt au distributeur ; 3 niveaux d'argent (banque, cash, valeur du sac).
 - Échapper aux caméras / profil criminel (visage, vêtements, véhicule mémorisés).
 
@@ -121,16 +143,17 @@
 
 - 17 nov 8h55 : 120 649 crédits restants (2 721 / 123 370), inchangé.
 - 17 nov 16h54 : 118 261 crédits restants (5 109 / 123 370) ; ~2 400 crédits consommés depuis 8h55 par un autre fil (pas la boucle). Large marge.
+- 18 nov 8h55 : 115 251 crédits restants (8 119 / 123 370), inchangé depuis 0h55.
 
 ## Dernière vidéo
-- 2026-11-17 18:30 (Paris, programmée) : Ton perso change de corps. Avant : 2026-11-16 18:30 Braquer un magasin. Avant : 2026-11-15 21:27 Voler une voiture.
+- 2026-11-18 18:30 (Paris, programmée) : Profil criminel. Avant : 2026-11-17 18:30 Ton perso change de corps. Avant : 2026-11-16 18:30 Braquer un magasin. Avant : 2026-11-15 21:27 Voler une voiture.
 
 ## Production par jour (plan 16-18 nov : 1 carrousel notif + 1 vidéo auto par jour)
 | Jour | Sujet | Carrousel (post Buffer) | Vidéo TikTok | Short YouTube |
 |---|---|---|---|---|
 | lun 16 | Braquer un magasin (masque, tir d'intimidation, coffre à code, sac → receleur, cash perdu) | FAIT : 6afa475c06e1675856b430ab, notif 12:30 ; images branche claude/project-thread-xla67j carrousels/braquage/ ; fichiers /mnt/project-files/carrousel-gta6/braquage/ | FAIT : 6afac46a60a910801c7f0923, auto 18:30 (paysage, 42,5 s, voix ElevenLabs, videos/braquage-gta6-el.mp4) | FAIT : 6afac46b06e1675856db9b02, auto 18:30 (videos/braquage-gta6-el-vertical.mp4) |
 | mar 17 | Ton perso change de corps (fast-food = poids, salle = muscle, développé couché L2/R2, nuit blanche = visage marqué, cavale/fête = corps qui paie) | FAIT : 6afb9b00df36f4d825584c1e, notif 12:30 ; images branche claude/project-thread-1tu61p carrousels/corps/ ; fichiers /mnt/project-files/carrousel-gta6/corps/ | FAIT : 6afb9cc885dca6b14a0c39e0, auto 18:30 (vertical 1080×1920, 33,4 s, videos/corps-gta6.mp4 branche claude/project-thread-1tu61p) | FAIT : 6afb9ccaf83aaca8f3995fb9, auto 18:30 (même fichier) |
-| mer 18 | | | | |
+| mer 18 | Profil criminel (remplace l'honneur, violence inutile, 4 niveaux, Jason/Lucia séparés, profil qui se brise) | FAIT : 6afceb999f3765f6ab1b4d16, notif 12:30 ; images branche claude/project-thread-6m54gc carrousels/profil/ ; fichiers /mnt/project-files/carrousel-gta6/profil/ | FAIT : 6afceba5bb12698d15844acc, auto 18:30 (vertical 1080×1920, 34,5 s, videos/profil-gta6.mp4 branche claude/project-thread-6m54gc) | FAIT : 6afceba693fa11d37df36e70, auto 18:30 (même fichier) |
 
 ## Historique des passages
 - 2026-11-15 : boucle créée.
@@ -142,3 +165,5 @@
 - 2026-11-17 0h55-1h20 : analyse (pas de stats neuves) + production complète du mardi : carrousel "corps" programmé en notif 12h30, vidéo verticale 33,4 s programmée 18h30 TikTok + Short. Plans tirés des trailers 1 et 2 (dont développé couché sur la plage, t2 38,4 s) + captures gematsu, planche de vérif regardée. Hébergement sur la branche claude/project-thread-1tu61p (branche de ce passage). Scripts : /mnt/project-files/videos-gta6/corps/ (make_corps.py = modèle VERTICAL réutilisable, shots.json, mix_corps.py).
 - 2026-11-17 8h55 : analyse seulement (pas de stats neuves, dernière lecture Buffer 16 nov 13h09). Production du mardi déjà faite : rien refait. Carrousel braquage du 16 nov toujours absent en "via network" : signalé.
 - 2026-11-17 16h54 : analyse avec stats fraîches (TikTok 12h10, YouTube 15h44). Braquage paysage = 33 % : paysage abandonné pour de bon. Carrousel braquage considéré non publié. Production du mardi déjà faite : rien refait. Pistes mercredi notées (sujet orienté partage, fin en question fermée).
+- 2026-11-18 0h55-1h10 : analyse (pas de stats neuves) + production complète du mercredi : carrousel « profil criminel » notif 12h30, vidéo verticale 34,5 s programmée 18h30 TikTok + Short. Hébergement branche claude/project-thread-6m54gc. Scripts : /mnt/project-files/videos-gta6/profil/ (make_profil.py, shots.json, mix_profil.py) et carrousel-gta6/profil/make_profil.py. Fin du plan 16-18 nov : la boucle s'arrête après le passage de 16h54.
+- 2026-11-18 8h55 : analyse seulement (pas de stats neuves, dernière lecture Buffer 17 nov 12h10). Production du mercredi déjà faite : rien refait. Carrousel « corps » toujours absent en « via network ».
