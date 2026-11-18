@@ -213,7 +213,7 @@ const dues = (c: Clip) =>
 // prend sa place au même horaire ; l'ancien repasse dans « À poster » (il repartira plus tard
 // s'il reste le meilleur). Les clips programmés à la main (bouton « Publier ») ne sont jamais
 // remplacés.
-const AUTO_AHEAD = 1;
+const AUTO_AHEAD = 3; // 18/11 : 3 clips d'avance (un toutes les 10 min sans trou entre deux passages)
 const SWAP_MIN_LEAD_MS = 10 * 60_000; // on ne touche plus à un post qui part dans moins de 10 min
 
 /** Envoie à Buffer les clips validés : le meilleur d'abord, un seul d'avance, remplacé si mieux. */
