@@ -192,6 +192,8 @@ export async function publishOne(id: string): Promise<{ ok: boolean; message: st
 // Règle du 16/11 : un clip qui ne dépasse pas 6/10 ne part jamais tout seul (il reste dans
 // « À poster » ; le bouton « Publier » reste possible, c'est alors un choix fait à la main).
 export const MIN_SCORE = 7;
+// Seuil réel : auto_min de la Programmation (7 par défaut), jamais sous 1.
+const minScore = (auto?: number) => Math.max(1, auto || MIN_SCORE);
 
 const dues = (c: Clip) =>
   Object.values(c.networks ?? {}).filter((n) => n?.state === "scheduled" && n.due).map((n) => +new Date(n!.due!));
@@ -215,7 +217,7 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
   const nets = NETS.filter((n) => !schedule.nets?.length || schedule.nets.includes(n));
 
   const todo = clips
-    .filter((c) => c.status === "approved" && c.video_url && isGtaClip(c) && (c.potential ?? 0) >= MIN_SCORE)
+    .filter((c) => c.status === "approved" && c.video_url && isGtaClip(c) && (c.potential ?? 0) >= minScore(schedule.auto_min))
     .filter((c) => !Object.values(c.networks ?? {}).some((n) => n?.state === "error" && now - +new Date(n.at) < RETRY_AFTER_MS))
     // Le meilleur clip d'abord (note de clic), à égalité le plus récent (plus frais).
     .sort((a, b) => (b.potential ?? 0) - (a.potential ?? 0) || (b.decided_at ?? "").localeCompare(a.decided_at ?? ""));
