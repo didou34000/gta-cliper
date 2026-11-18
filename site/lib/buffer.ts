@@ -127,8 +127,15 @@ export const isGtaClip = (c: Clip) => GTA_RE.test([c.title, c.description, ...(c
 // clipper (vidéos niches, carrousels…) : on s'écarte d'eux aussi.
 const ORG = process.env.BUFFER_ORG_ID || "6ae8721deaf44e2b4ec5d7f2";
 const POSTS_QUERY = `query Posts($input: PostsInput!) {
-  posts(first: 100, input: $input) { edges { node { dueAt sentAt } } }
+  posts(first: 100, input: $input) { edges { node { dueAt sentAt text } } }
 }`;
+// Textes des posts lus au dernier appel : sert à ne jamais envoyer deux fois le même clip
+// (deux appels simultanés de la file, ou un état du site en retard sur Buffer).
+let lastTexts: string[] = [];
+const inBufferAlready = (c: Clip) => {
+  const keys = [c.title, c.description].map((x) => (x ?? "").trim().toLowerCase().slice(0, 60)).filter((x) => x.length >= 20);
+  return keys.some((k) => lastTexts.some((t) => t.includes(k)));
+};
 export async function bufferDues(): Promise<number[] | null> {
   try {
     const r = await fetch(API, {
@@ -145,9 +152,9 @@ export async function bufferDues(): Promise<number[] | null> {
     });
     const j = await r.json().catch(() => null);
     if (!j?.data?.posts) { console.error("Buffer posts:", j?.errors?.[0]?.message ?? r.status); return null; }
-    return (j.data?.posts?.edges ?? [])
-      .map((e: { node: { dueAt?: string; sentAt?: string } }) => +new Date(e.node?.sentAt ?? e.node?.dueAt ?? 0))
-      .filter((t: number) => t > 0);
+    const edges = (j.data?.posts?.edges ?? []) as { node: { dueAt?: string; sentAt?: string; text?: string } }[];
+    lastTexts = edges.map((e) => (e.node?.text ?? "").toLowerCase());
+    return edges.map((e) => +new Date(e.node?.sentAt ?? e.node?.dueAt ?? 0)).filter((t: number) => t > 0);
   } catch {
     return null;
   }
@@ -220,6 +227,7 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
   const nets = NETS.filter((n) => !schedule.nets?.length || schedule.nets.includes(n));
 
   const todo = clips
+    .filter((c) => !inBufferAlready(c))
     .filter((c) => c.status === "approved" && c.video_url && isGtaClip(c) && matchesGame(c, schedule.game) && (c.potential ?? 0) >= minScore(schedule.auto_min))
     .filter((c) => !Object.values(c.networks ?? {}).some((n) => n?.state === "error" && now - +new Date(n.at) < RETRY_AFTER_MS))
     // Le meilleur clip d'abord (note de clic), à égalité le plus récent (plus frais).
