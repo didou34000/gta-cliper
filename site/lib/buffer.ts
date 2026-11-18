@@ -120,6 +120,8 @@ async function unschedule(id: string): Promise<boolean> {
 const GTA_RE = /\bgta\b|gta ?(6|vi)\b|grand theft auto/i;
 // Programmation sur GTA VI : on ne publie que des clips GTA VI (pas le stock GTA V).
 const GTA6_RE = /grand theft auto vi\b|gta\s*(6|vi)\b/i;
+// Langue réglée sur « fr » (ou autre) : seuls les clips d'un passage dans cette langue partent.
+const matchesLang = (c: Clip, lang?: string) => !lang || lang === "any" || c.run?.lang === lang;
 const matchesGame = (c: Clip, game?: string) => !game || !/\bvi$/i.test(game.trim()) || GTA6_RE.test([(c as unknown as { game?: string }).game ?? "", c.title, ...(c.hashtags ?? [])].join(" "));
 export const isGtaClip = (c: Clip) => GTA_RE.test([c.title, c.description, ...(c.hashtags ?? [])].join(" "));
 
@@ -228,7 +230,7 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
 
   const todo = clips
     .filter((c) => !inBufferAlready(c))
-    .filter((c) => c.status === "approved" && c.video_url && isGtaClip(c) && matchesGame(c, schedule.game) && (c.potential ?? 0) >= minScore(schedule.auto_min))
+    .filter((c) => c.status === "approved" && c.video_url && isGtaClip(c) && matchesGame(c, schedule.game) && matchesLang(c, schedule.lang) && (c.potential ?? 0) >= minScore(schedule.auto_min))
     .filter((c) => !Object.values(c.networks ?? {}).some((n) => n?.state === "error" && now - +new Date(n.at) < RETRY_AFTER_MS))
     // Le meilleur clip d'abord (note de clic), à égalité le plus récent (plus frais).
     .sort((a, b) => (b.potential ?? 0) - (a.potential ?? 0) || (b.decided_at ?? "").localeCompare(a.decided_at ?? ""));

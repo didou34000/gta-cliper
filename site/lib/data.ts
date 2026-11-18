@@ -48,6 +48,7 @@ export type RunInfo = {
   min_views?: number;
   hours?: number;
   source?: string;            // lien de la vidéo, pour un passage « lien YouTube »
+  lang?: string;              // langue des streamers demandée pour ce passage (fr, en… ou any)
 };
 
 export type Heartbeat = {
