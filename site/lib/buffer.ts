@@ -241,8 +241,11 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
   };
 
   // Clips du bot programmés et pas encore partis.
+  // Buffer fait foi : un horaire noté sur le site mais absent de Buffer (post supprimé ou
+  // envoyé plus tôt à la main) ne bloque plus la file.
+  const live = (d: number) => d > now && external.some((e) => Math.abs(e - d) < 120_000);
   const ahead = clips
-    .filter((c) => c.status === "posted" && dues(c).some((d) => d > now))
+    .filter((c) => c.status === "posted" && dues(c).some(live))
     .filter((c) => Object.values(c.networks ?? {}).every((n) => !n || n.state !== "scheduled" || n.auto));
   let sent = 0, swapped = 0;
 
@@ -269,7 +272,7 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
   }
 
   // 2) Toujours un clip d'avance : s'il n'y en a pas, on programme le meilleur au prochain créneau.
-  const allDues = [...new Set([...clips.flatMap(dues), ...external])];
+  const allDues = [...new Set(external)];
   const perDay = new Map<string, number>(); // posts déjà prévus par jour (heure de Paris)
   for (const c of clips) {
     const d = dues(c);
@@ -284,7 +287,7 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
     return t;
   };
   let inFlight = ahead.length;
-  const inBuffer = clips.filter((c) => dues(c).some((d) => d > now)).length;
+  const inBuffer = clips.filter((c) => dues(c).some(live)).length;
   for (const c of todo) {
     if (inFlight >= AUTO_AHEAD || inBuffer + sent >= MAX_SCHEDULED) break;
     // Premier créneau libre à au moins `every` de TOUT post (passé ou à venir, vidéos niches
