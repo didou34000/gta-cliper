@@ -182,6 +182,27 @@ def trim_window(start: float, end: float, duration: float, words: list,
     return start, end
 
 
+
+def _render_subtitled(cfg, meta, words, item_dir, video, out, start, duration, beat):
+    """Ancien style : accroche rose en haut + sous-titres karaoké (render.style: subtitles)."""
+    rc, sc = cfg["render"], cfg["subtitles"]
+    ass = subtitles.build_ass(
+        words, item_dir / "subs.ass", width=rc["width"], height=rc["height"],
+        font=sc["font"], font_size=sc["font_size"], per_line=sc["words_per_line"],
+        color=sc["color"], highlight=sc["highlight_color"], outline=sc["outline"],
+        outline_color=sc.get("outline_color", "&H003D0A2A"), hook_bg=sc.get("hook_bg", "&H00A53EFF"),
+        hook_fg=sc.get("hook_fg", "&H00FFFFFF"),
+        pos_y=sc["position_y"], uppercase=sc["uppercase"],
+        hook=meta["hook"] if sc.get("hook", True) else "", hook_y=sc.get("hook_y", 330),
+        hook_size=sc.get("hook_size", 104), hook_duration=duration, time_offset=start,
+    )
+    beat("render", f"Montage vertical {rc['width']}×{rc['height']} (mode {rc['layout']}) "
+                   f"+ accroche en haut + sous-titres {sc['words_per_line']} mots par ligne")
+    render.render_vertical(video, ass, out, width=rc["width"], height=rc["height"],
+                           layout=rc["layout"], facecam=rc.get("facecam"), start=start,
+                           duration=duration)
+
+
 def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
                  twitch_title: str = "", source_url: str = "", extra: dict | None = None,
                  skip_llm: bool = False, words: list | None = None, beat=None) -> Path:
@@ -277,10 +298,13 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
                 try:
                     from .metadata import punch_title
                     p = punch_title(streamer_name, game, meta["moment"], meta["title"], meta["hook"],
-                                    text, cfg["llm"].get("title_model", "claude-sonnet-5-5"))
+                                    text, cfg["llm"].get("title_model", "claude-sonnet-5-5"),
+                                    box_top=meta.get("box_top", ""), box_bottom=meta.get("box_bottom", ""))
                     if p:
                         first = meta["title"]
                         meta["title"], meta["hook"] = p.title, p.hook or meta["hook"]
+                        meta["box_top"] = p.box_top or meta.get("box_top", "")
+                        meta["box_bottom"] = p.box_bottom or meta.get("box_bottom", "")
                         meta["alt_titles"] = list(dict.fromkeys(p.alt_titles + [first]))[:3]
                 except Exception as e:
                     log.warning("Titre renforcé impossible : %s", e)
@@ -306,25 +330,25 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
         words = [w for w in words if w.end > start and w.start < end]
         duration = end - start
         text = media.transcript_text(words)
-    ass = subtitles.build_ass(
-        words, item_dir / "subs.ass", width=rc["width"], height=rc["height"],
-        font=sc["font"], font_size=sc["font_size"], per_line=sc["words_per_line"],
-        color=sc["color"], highlight=sc["highlight_color"], outline=sc["outline"],
-        outline_color=sc.get("outline_color", "&H003D0A2A"), hook_bg=sc.get("hook_bg", "&H00A53EFF"),
-        hook_fg=sc.get("hook_fg", "&H00FFFFFF"),
-        pos_y=sc["position_y"], uppercase=sc["uppercase"],
-        hook=meta["hook"] if sc.get("hook", True) else "", hook_y=sc.get("hook_y", 330),
-        hook_size=sc.get("hook_size", 104), hook_duration=duration, time_offset=start,
-    )
-    beat("render", f"Montage vertical {rc['width']}×{rc['height']} (mode {rc['layout']}) "
-                   f"+ accroche en haut + sous-titres {sc['words_per_line']} mots par ligne")
+    style = rc.get("style", "boxes")
     out = item_dir / "clip.mp4"
-    render.render_vertical(video, ass, out, width=rc["width"], height=rc["height"],
-                           layout=rc["layout"], facecam=rc.get("facecam"), start=start,
-                           duration=duration)
+    if style == "boxes":
+        # Style du 18/11 : encadrés blancs + emojis, pas de sous-titres (demande du propriétaire).
+        from . import boxes
+        top_txt = meta.get("box_top") or meta["title"]
+        top = boxes.make_box(top_txt, item_dir / "box_top.png", size=66)
+        bottom = boxes.make_box(meta.get("box_bottom", ""), item_dir / "box_bottom.png", size=52,
+                                max_lines=1)
+        beat("render", f"Montage {rc['width']}×{rc['height']} : encadré « {top_txt} »"
+                       + (f" + réaction « {meta.get('box_bottom')} »" if bottom else "")
+                       + ", sans sous-titres")
+        render.render_boxes(video, out, top, bottom, width=rc["width"], height=rc["height"],
+                            start=start, duration=duration)
+    else:
+        _render_subtitled(cfg, meta, words, item_dir, video, out, start, duration, beat)
     cover_ok = False
     handle = cfg.get("account_handle", "@gta6francenews")
-    if cfg.get("cover", True):
+    if cfg.get("cover", True) and style != "boxes":  # en style encadrés, la 1re image fait la couverture
         try:  # miniature avec le titre (gratuit) : 3 premières images + vignette du site
             render.make_cover(video, start + duration * 0.45, meta["title"], handle,
                               item_dir / "thumb.jpg", rc["width"], rc["height"])

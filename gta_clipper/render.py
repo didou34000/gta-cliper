@@ -153,3 +153,45 @@ def add_cover(video: Path, cover: Path, seconds: float = COVER_SECONDS) -> Path:
                     "-movflags", "+faststart", str(tmp)], check=True)
     tmp.replace(video)
     return video
+
+
+# ---------------------------------------------------------------------------
+# Style « encadrés » (18/11) : fond noir, le jeu en grand au centre, un titre dans un encadré
+# blanc juste au-dessus et une courte réaction en dessous. Pas de sous-titres.
+BOX_VIDEO_H = 700  # hauteur du jeu sur 1920 (léger zoom : les bords gauche/droite sont rognés)
+
+
+def render_boxes(src: Path, out: Path, top: Path | None, bottom: Path | None, *,
+                 width: int = 1080, height: int = 1920,
+                 start: float = 0.0, duration: float | None = None) -> Path:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    vh = BOX_VIDEO_H
+    vy = (height - vh) // 2
+    inputs = ["-i", str(src.resolve())]
+    g = (f"color=c=black:s={width}x{height}:r=30[bg];"
+         f"[0:v]scale=-2:{vh},crop='min(iw,{width})':{vh}[g];"
+         f"[bg][g]overlay=(W-w)/2:{vy}:shortest=1[v0]")
+    last, n = "v0", 1
+    from PIL import Image
+    if top:
+        th = Image.open(top).height
+        inputs += ["-i", str(top.resolve())]
+        g += f";[{last}][{n}:v]overlay=(W-w)/2:{max(40, vy - th + 22)}[v{n}]"
+        last, n = f"v{n}", n + 1
+    if bottom:
+        inputs += ["-i", str(bottom.resolve())]
+        g += f";[{last}][{n}:v]overlay=(W-w)/2:{vy + vh + 170}[v{n}]"
+        last, n = f"v{n}", n + 1
+    g += f";[{last}]setsar=1,format=yuv420p[v]"
+    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
+    if start:
+        cmd += ["-ss", f"{start:.3f}"]
+    if duration:
+        cmd += ["-t", f"{duration:.3f}"]  # option d'entrée : s'applique au clip source
+    cmd += inputs
+    cmd += ["-filter_complex", g, "-map", "[v]", "-map", "0:a?",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-r", "30",
+            "-maxrate", "4M", "-bufsize", "8M",
+            "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(out.resolve())]
+    subprocess.run(cmd, check=True)
+    return out

@@ -55,6 +55,11 @@ Accroche (hook) : le texte incrusté EN HAUT de la vidéo, lu en une seconde.
 - Concrète et explicative plutôt que vague : on comprend le sujet de la vidéo rien qu'en la lisant. "IL DÉCOUVRE L'ESSENCE SUR GTA 6", "LA VOITURE LA PLUS RAPIDE DE GTA 6", "IL VOLE UN TANK EN PLEINE VILLE" valent mieux que "MOMENT INCROYABLE" ou "IL DÉCOUVRE UN TRUC FOU". Un chiffre ou un détail précis (1v4, 10 secondes, 3 étoiles) aide.
 - Vraie : elle décrit ce que montrent les images ou la transcription, jamais un événement inventé. Si tu ne comprends pas ce qui se passe, une accroche de curiosité honnête ("SA RÉACTION VAUT TOUT") plutôt qu'une invention, et confidence à "low".
 
+Encadrés (box_top, box_bottom) : le texte incrusté sur la vidéo, style TikTok (encadré blanc, texte noir), à la place des sous-titres.
+- box_top : le titre au-dessus du jeu, comme l'écrirait un créateur TikTok français : court (45 caractères max), oral, en minuscules sauf noms propres, avec 1 ou 2 emojis qui collent au moment (placés après le mot concerné ou en fin de phrase). Il dit QUI fait QUOI, le détail fou peut aller entre parenthèses. Exemples : "Tobias vole une rs7 🏎️ (les détails 🤯🤯)", "Squeezie se fait braquer en 10 secondes 💀", "ZeratoR découvre les PNJ qui se souviennent de lui 😳", "Gotaga trouve la voiture la plus rapide 🚀 (et la crashe 😭)".
+- box_bottom : une réaction courte sous le jeu, 3 à 4 mots + 1 emoji, ton spectateur : "Respect Rockstar 👏", "Il a pas compris 💀", "Rockstar sont fous 🤯", "Le réalisme 😳", "Attends la fin 😭". Jamais de hashtag ni de guillemets.
+- Toujours vrais : ils décrivent ce que montrent les images ou la transcription.
+
 Découpe (start_s, end_s) : le clip Twitch a été coupé à la main par un viewer, souvent \
 trop tôt ou trop tard (il démarre au milieu de l'action ou traîne longtemps après). \
 Les images portent leur instant (en secondes) et la transcription a des repères (t=…s). \
@@ -104,6 +109,8 @@ class ClipMetadata(BaseModel):
     confidence: str = Field(description="high | medium | low : à quel point le titre colle au contenu")
     hook: str = Field(description="Accroche incrustée en haut de la vidéo, 42 caractères max")
     corrections: list[Correction] = Field(description="Mots de la transcription à corriger")
+    box_top: str = Field(description="Titre de l'encadré du haut, 45 caractères max, 1 ou 2 emojis")
+    box_bottom: str = Field(description="Réaction de l'encadré du bas, 3 à 4 mots + 1 emoji")
     moment: str = Field(description="Ce qui se passe concrètement dans le clip (2 phrases max), "
                                     "vu sur les images et entendu : sert à réécrire le titre")
     click_score: int = Field(description="Potentiel de clic de 1 à 10, exigeant (voir consignes)")
@@ -186,6 +193,8 @@ class Punch(BaseModel):
     title: str = Field(description="Le titre le plus accrocheur, 70 caractères max")
     alt_titles: list[str] = Field(description="2 autres titres forts")
     hook: str = Field(description="Accroche incrustée, 3 à 7 mots, 40 caractères max, en MAJUSCULES")
+    box_top: str = Field(description="Titre de l'encadré du haut (style TikTok, minuscules, 1 ou 2 emojis, 45 caractères max)")
+    box_bottom: str = Field(description="Réaction de l'encadré du bas, 3 à 4 mots + 1 emoji")
 
 
 PUNCH_SYSTEM = """Tu es le meilleur rédacteur de titres TikTok / YouTube Shorts de France pour \
@@ -196,6 +205,7 @@ sans mentir.
 """ + SYSTEM.split("Description :")[0].split("Règles du titre :", 1)[-1].join(["Règles du titre :", ""]) + \
 """
 """ + SYSTEM.split("Accroche (hook) :", 1)[-1].split("Découpe (start_s", 1)[0].join(["Accroche (hook) :", ""]) + """
+On te donne aussi un premier encadré du haut et du bas : rends-les aussi plus forts.
 En plus :
 - Le titre doit créer une émotion immédiate (rire, choc, curiosité, « non il a pas fait ça »).
 - Commence par le streamer ou par l'élément le plus fort, jamais par un mot faible.
@@ -206,13 +216,15 @@ En plus :
 
 
 def punch_title(streamer: str, game: str, moment: str, title: str, hook: str,
-                transcript: str = "", model: str = "claude-sonnet-5-5") -> Punch | None:
+                transcript: str = "", model: str = "claude-sonnet-5-5",
+                box_top: str = "", box_bottom: str = "") -> Punch | None:
     """Réécrit titre + accroche avec un modèle plus fort, en texte seul (≈ 0,5-1 centime)."""
     from .guard import Guard
     if not Guard.get().allow_llm():
         return None
     user = (f"Streamer : {streamer}\nJeu : {game or '(non précisé)'}\n"
-            f"Ce qui se passe : {moment}\nPremier titre : {title}\nPremière accroche : {hook}\n\n"
+            f"Ce qui se passe : {moment}\nPremier titre : {title}\nPremière accroche : {hook}\n"
+            f"Premiers encadrés : haut « {box_top} » · bas « {box_bottom} »\n\n"
             f"Paroles (auto) :\n<transcription>\n{(transcript or '(aucune)')[:2500]}\n</transcription>")
     client = anthropic.Anthropic(max_retries=2, timeout=60)
     resp = client.messages.parse(model=model, max_tokens=600, system=PUNCH_SYSTEM,
