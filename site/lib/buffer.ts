@@ -174,6 +174,29 @@ function freeSlot(from: number, busy: number[], gap: number, days: number[], sta
   return t;
 }
 
+// 18/11 (demande utilisateur) : une vidéo récap GTA 6 toutes les 3 h à partir du 18/11 17h00
+// Paris (16:00 UTC). Ces créneaux restent libres pour les clips, même avant d'être dans Buffer.
+const RECAP_FROM = Date.UTC(2026, 10, 18, 16, 0);
+const RECAP_EVERY = 3 * 3600_000;
+function recapSlots(now: number): number[] {
+  const out: number[] = [];
+  const first = Math.max(RECAP_FROM, RECAP_FROM + Math.floor((now - RECAP_FROM) / RECAP_EVERY) * RECAP_EVERY);
+  for (let t = first; t < now + 8 * 24 * 3600_000; t += RECAP_EVERY) out.push(t);
+  return out;
+}
+const OTHER_GAP = 30 * 60_000;
+
+function clipSlot(from: number, clipBusy: number[], otherBusy: number[], gap: number, days: number[], start: number, end: number): Date {
+  let t = nextAllowed(new Date(from), days, start, end);
+  for (let i = 0; i < 200; i++) {
+    const a = clipBusy.filter((d) => Math.abs(d - +t) < gap).map((d) => d + gap);
+    const b = otherBusy.filter((d) => Math.abs(d - +t) < OTHER_GAP).map((d) => d + OTHER_GAP);
+    if (!a.length && !b.length) return t;
+    t = nextAllowed(new Date(Math.max(...a, ...b)), days, start, end);
+  }
+  return t;
+}
+
 /** Bouton « Publier » : programme CE clip sur Buffer au premier créneau libre (1 h 30 d'écart),
  *  même si la publication auto est coupée. */
 export async function publishOne(id: string): Promise<{ ok: boolean; message: string; due?: string }> {
@@ -297,16 +320,19 @@ export async function publishQueue(): Promise<{ ok: boolean; sent: number; messa
     }
     return t;
   };
+  // Écart `every` entre CLIPS seulement ; les autres posts (vidéos récap / niche) et les
+  // créneaux récap réservés ne bloquent que ±30 min autour d'eux.
+  const clipDues = clips.flatMap(dues);
   let inFlight = ahead.length;
   const inBuffer = clips.filter((c) => dues(c).some(live)).length;
   for (const c of todo) {
     if (inFlight >= AUTO_AHEAD || inBuffer + sent >= MAX_SCHEDULED) break;
     // Premier créneau libre à au moins `every` de TOUT post (passé ou à venir, vidéos niches
     // comprises) : un post prévu ce soir ne bloque plus les clips de l'après-midi.
-    const due = freeSlot(+slot(now + FIRST_DELAY_MS), allDues, every, schedule.pub_days, schedule.pub_from, schedule.pub_to);
+    const due = clipSlot(+slot(now + FIRST_DELAY_MS), clipDues, [...allDues, ...recapSlots(now)], every, schedule.pub_days, schedule.pub_from, schedule.pub_to);
     if (+due - now > 7 * 24 * 3600_000) break; // rien d'autorisé dans les 7 jours : on attend
     if (await schedTo(c, due)) {
-      sent++; inFlight++; allDues.push(+due);
+      sent++; inFlight++; allDues.push(+due); clipDues.push(+due);
       const k = parisClock(due).date; perDay.set(k, (perDay.get(k) ?? 0) + 1);
     }
   }
