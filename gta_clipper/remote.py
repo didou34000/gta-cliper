@@ -16,7 +16,7 @@ import os
 import secrets
 import time
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
@@ -66,6 +66,27 @@ PRUNE_ORDER = {"rejected": 0, "posted": 1, "pending": 2, "approved": 3}
 MB = 1024 * 1024
 
 
+LOCK_AFTER_DUE_H = 12  # Buffer peut publier en retard ; on garde la vidéo 12 h après l'heure prévue
+
+
+def _still_needed_by_buffer(d: dict) -> bool:
+    """Vrai si un réseau a ce clip programmé (Buffer télécharge la vidéo seulement au moment
+    de publier : la supprimer avant fait échouer le post « media URL not publicly accessible »)."""
+    now = datetime.now(timezone.utc)
+    for n in (d.get("networks") or {}).values():
+        if not isinstance(n, dict) or n.get("state") != "scheduled":
+            continue
+        try:
+            due = datetime.fromisoformat(str(n.get("due", "")).replace("Z", "+00:00"))
+        except ValueError:
+            return True  # heure illisible : dans le doute on garde
+        if due.tzinfo is None:
+            due = due.replace(tzinfo=timezone.utc)
+        if now - due < timedelta(hours=LOCK_AFTER_DUE_H):
+            return True
+    return False
+
+
 def prune_site(max_clips: int = 0, keep: str = "", high_mb: int = 800, low_mb: int = 400,
                keep_heartbeats: int = 30) -> list[str]:
     """Ménage du stockage (on reste bien sous le quota gratuit) :
@@ -105,15 +126,20 @@ def prune_site(max_clips: int = 0, keep: str = "", high_mb: int = 800, low_mb: i
         if not ds:
             return "pending"
         try:
-            return requests.get(ds[-1]["url"], timeout=20).json().get("status", "pending")
+            d = requests.get(ds[-1]["url"], timeout=20).json()
         except Exception:
             return "approved"  # dans le doute, on ne supprime pas en priorité
+        if _still_needed_by_buffer(d):
+            return "locked"
+        return d.get("status", "pending")
 
     size = {cid: sum(int(b.get("size", 0)) for b in bl) for cid, bl in clips.items()}
     st = {cid: status(cid) for cid in clips if cid != keep}
     victims = [cid for cid, s in st.items() if s == "rejected"]
     left = total - sum(size[c] for c in victims)
-    rest = sorted((c for c in st if c not in victims), key=lambda cid: (PRUNE_ORDER.get(st[cid], 2), cid))
+    # « locked » : programmé dans Buffer, qui va chercher la vidéo à l'heure du post -> jamais supprimé.
+    rest = sorted((c for c in st if c not in victims and st[c] != "locked"),
+                  key=lambda cid: (PRUNE_ORDER.get(st[cid], 2), cid))
     if total >= high_mb * MB:
         for cid in rest:
             if left <= low_mb * MB:
