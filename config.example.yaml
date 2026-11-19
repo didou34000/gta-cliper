@@ -151,6 +151,15 @@ youtube:
   max_minutes: 180        # au-delà, seules les 180 premières minutes sont analysées
   analysis_model: small   # Whisper rapide pour lire toute la vidéo (les clips gardent le modèle précis)
 
+# Mode lives (python -m gta_clipper lives, workflow « Lives ») : le bot lit lui-même les
+# lives FR en cours (via la VOD du live) et ne clippe que les moments drôles.
+lives:
+  top: 4                     # lives regardés à chaque passage (les plus regardés)
+  window_minutes: 60         # tranche lue au maximum par live et par passage
+  min_score: 7               # note minimale (lecture de la transcription) pour monter le clip
+  max_clips_per_streamer: 2
+  lag_seconds: 90
+
 paths:
   work: data/work
   review: data/review       # clips en attente de validation

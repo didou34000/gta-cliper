@@ -54,6 +54,9 @@ def main() -> None:
     yt.add_argument("--jeu", default="", help='Jeu de la vidéo, ex. "Grand Theft Auto VI" ou "tous"')
     yt.add_argument("--no-llm", action="store_true")
 
+    li = sub.add_parser("lives", help="Regarde les lives en cours et clippe lui-même les moments drôles")
+    li.add_argument("--no-llm", action="store_true")
+
     sub.add_parser("site-test", help="Envoie un statut + le dernier clip local au site, pour tester la liaison")
 
     rv = sub.add_parser("review", help="Lance l'interface de validation")
@@ -73,6 +76,10 @@ def main() -> None:
         print(f"{len(out)} clip(s) prêts" + (" (et envoyés sur le site)." if out and __import__("gta_clipper.remote", fromlist=["enabled"]).enabled() else "."))
         for d in out:
             print(" -", d / "clip.mp4")
+    elif a.cmd == "lives":
+        from .lives import run_lives
+        out = run_lives(cfg, skip_llm=a.no_llm)
+        print(f"{len(out)} clip(s) faits depuis les lives.")
     elif a.cmd == "run":
         out = run(cfg, skip_llm=a.no_llm, chat_dir=a.chat_dir)
         print(f"{len(out)} clip(s) en attente de validation. Lance : python -m gta_clipper review")

@@ -214,7 +214,8 @@ class Moments(BaseModel):
 
 def pick_moments(segs: list[Seg], peaks: list[Peak], n: int, *, title: str = "",
                  channel: str = "", game: str = "", model: str = "claude-haiku-5-5",
-                 duration: float = 0, found: dict | None = None) -> list[dict]:
+                 duration: float = 0, found: dict | None = None, system: str = "",
+                 fallback: bool = True) -> list[dict]:
     """Demande à Claude les n meilleurs moments. Sans clé / en cas d'échec : pics de volume.
     Si `found` est fourni, on y range le jeu reconnu par Claude (found["jeu"])."""
     from .guard import Guard
@@ -229,7 +230,7 @@ def pick_moments(segs: list[Seg], peaks: list[Peak], n: int, *, title: str = "",
             import anthropic
             client = anthropic.Anthropic(max_retries=2, timeout=180)
             resp = client.messages.parse(
-                model=model, max_tokens=4000, system=SYSTEM,
+                model=model, max_tokens=4000, system=system or SYSTEM,
                 messages=[{"role": "user", "content": msg}], output_format=Moments)
             from . import usage
             usage.llm(model, resp)
@@ -237,11 +238,11 @@ def pick_moments(segs: list[Seg], peaks: list[Peak], n: int, *, title: str = "",
             if found is not None and resp.parsed_output:
                 found["jeu"] = " ".join(resp.parsed_output.jeu.split())[:40]
             out = _clean([m.model_dump() for m in got], segs, duration)
-            if out:
+            if out or not fallback:
                 return out[:n]
         except Exception as e:
             log.warning("Choix des moments par l'IA impossible : %s", e)
-    return fallback_moments(segs, peaks, n, duration)
+    return fallback_moments(segs, peaks, n, duration) if fallback else []
 
 
 def fallback_moments(segs: list[Seg], peaks: list[Peak], n: int, duration: float) -> list[dict]:
