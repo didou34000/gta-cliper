@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
+from pydantic import BaseModel
 
 from . import media, render, subtitles
 from .highlights import chat_spikes
@@ -777,8 +778,12 @@ def _pick_and_make(cfg, skip_llm, rep, work, produced, already, pool):
         if count.get(c["streamer"], 0) < per:
             count[c["streamer"]] = count.get(c["streamer"], 0) + 1
             cands.append(c)
-    cands = cands[:k]
     game = game_label(cfg)
+    scan_n = int(os.environ.get("SCAN_CLIPS") or cfg.get("scan_clips", 0) or 0)
+    if scan_n and not skip_llm:
+        _scan_and_make(cfg, rep, work, produced, already, pool, scan_n, game)
+        return
+    cands = cands[:k]
     if not skip_llm:
         rep.event(f"Présélection : Claude Haiku note le potentiel de {len(cands)} clips "
                   f"({len(count)} streamers)", node="scoring", force=True)
@@ -801,6 +806,111 @@ def _pick_and_make(cfg, skip_llm, rep, work, produced, already, pool):
                    twitch_title=clip.title, source_url=clip.url, skip_llm=skip_llm,
                    extra={"views": clip.view_count, "kind": "twitch_clip", "rank": n,
                           "potential": c.get("score"), "potential_reason": c.get("raison", "")})
+
+
+SCAN_SYSTEM = """Tu es le meilleur clippeur TikTok FR. On te donne la transcription \
+(sous-titres) de clips Twitch de streamers français sur {game}, avec le titre du viewer et les vues.
+Ton seul but : trouver les moments VRAIMENT DRÔLES ou complètement fous, ceux qu'on envoie à \
+ses potes. Fou rire, rage absurde, réplique culte, bug hilarant, situation WTF, panique \
+ridicule, chute inattendue, clash entre potes, commentaire hyper drôle.
+
+Note de 1 à 10 (sois très exigeant, la plupart des clips valent 3 à 5) :
+- 9-10 : on pleure de rire, réplique culte ou situation folle compréhensible sans contexte.
+- 7-8 : vraiment drôle ou surprenant, une vraie chute, ça marche sans connaître le streamer.
+- 4-6 : sympa mais banal : il commente, il conduit, il découvre le décor, il dit « c'est beau ».
+- 1-3 : rien ne se passe, discussion, menu, attente, ou contenu sexuel / strip-club / nudité \
+(interdit sur TikTok, toujours 1).
+Une transcription vide ou de quelques mots sans chute vaut 3 maximum.
+Donne pour chaque clip une raison courte qui cite la phrase ou le moment drôle."""
+
+
+class _ScanScore(BaseModel):
+    n: int
+    score: int
+    raison: str
+
+
+class _ScanRanking(BaseModel):
+    scores: list[_ScanScore]
+
+
+def _scan_and_make(cfg, rep, work, produced, already, pool, scan_n, game):
+    """Mode « lire les sous-titres » (règle du 19/11 : « regarde les sous-titres et trouve de
+    bons clips drôles ») : on télécharge et transcrit beaucoup de clips (pas seulement les plus
+    vus), Claude lit toutes les transcriptions d'un coup et on ne monte que les vrais moments
+    drôles (7/10 minimum), du plus drôle au moins drôle."""
+    import anthropic
+    per = int(cfg.get("scan_per_streamer", 4))
+    count: dict[str, int] = {}
+    cands = []
+    for c in sorted(pool, key=lambda c: c["views"], reverse=True):
+        if c["duration"] > 62 or count.get(c["streamer"], 0) >= per:
+            continue
+        count[c["streamer"]] = count.get(c["streamer"], 0) + 1
+        cands.append(c)
+        if len(cands) >= scan_n:
+            break
+    rep.event(f"Lecture des sous-titres : {len(cands)} clips de {len(count)} streamers "
+              f"à transcrire", node="scoring", force=True)
+    wc = cfg["whisper"]
+    lines = []
+    for i, c in enumerate(cands):
+        try:
+            c["video"] = media.download(c["clip"].url, work / c["sid"] / "source.mp4",
+                                        max_mb=Guard.get().limits["max_download_mb"])
+            c["words"] = media.transcribe(c["video"], wc["model"], wc["device"], wc["compute_type"],
+                                          streamer=c["streamer"], game=game, language="fr")
+        except Exception as e:
+            rep.event(f"Clip {c['sid']} illisible : {str(e)[:120]}", node="twitch", level="warn")
+            c["words"] = None
+            continue
+        text = media.transcript_text(c["words"])[:900] or "(rien de dit)"
+        lines.append(f"[{i}] {c['streamer']} · {c['views']} vues · {c['duration']:.0f} s · "
+                     f"titre : {c['title'] or '(vide)'}\n{text}")
+    if not lines or not Guard.get().allow_llm():
+        rep.event("Lecture des sous-titres impossible (aucun clip lisible ou plafond Claude)",
+                  node="scoring", level="warn", force=True)
+        return
+    model = cfg.get("llm", {}).get("scan_model", "claude-sonnet-5-5")
+    try:
+        client = anthropic.Anthropic(max_retries=2, timeout=120)
+        resp = client.messages.parse(
+            model=model, max_tokens=4000, system=SCAN_SYSTEM.format(game=game or "le jeu"),
+            messages=[{"role": "user", "content": "\n\n".join(lines)}],
+            output_format=_ScanRanking)
+        from . import usage
+        usage.llm(model, resp)
+        scores = {s.n: s for s in (resp.parsed_output.scores if resp.parsed_output else [])}
+    except Exception as e:
+        rep.event(f"Lecture des sous-titres par Claude impossible : {e}", node="scoring",
+                  level="error", force=True)
+        return
+    for i, c in enumerate(cands):
+        s = scores.get(i)
+        c["score"] = max(1, min(10, s.score)) if s and c.get("words") is not None else 0
+        c["raison"] = (s.raison[:160] if s else "")
+    ranked = sorted(cands, key=lambda c: (c["score"], c["views"]), reverse=True)
+    rep.event("Sous-titres lus : " + " · ".join(
+        f"{c['streamer']} {c['score']}/10 ({c['views']} vues : {c['raison']})"
+        for c in ranked[:12]), node="scoring", force=True)
+    min_fun = int(os.environ.get("SCAN_MIN") or cfg.get("scan_min", 7))
+    keep = [c for c in ranked if c["score"] >= min_fun]
+    if not keep:
+        rep.event(f"Aucun clip drôle à {min_fun}/10 ou plus dans ce lot : rien n'est monté",
+                  node="scoring", force=True)
+        return
+    for n, c in enumerate(keep, 1):
+        clip, sid, name = c["clip"], c["sid"], c["streamer"]
+        rep.current = name
+        rep.streamer(name)["etat"] = "en cours"
+        label = (f"clip drôle {n}/{len(keep)} « {clip.title} » ({clip.view_count} vues, "
+                 f"{c['score']}/10 aux sous-titres)")
+        _make_clip(cfg, rep, produced, already, sid=sid, name=name, label=label,
+                   video_fn=lambda v=c["video"]: v, words=c["words"],
+                   twitch_title=clip.title, source_url=clip.url, skip_llm=False,
+                   extra={"views": clip.view_count, "kind": "twitch_clip", "rank": n,
+                          "potential": c["score"], "potential_reason": c["raison"],
+                          "fun_score": c["score"]})
 
 
 def run_youtube(cfg: dict, url: str, n: int = 3, streamer: str = "",
