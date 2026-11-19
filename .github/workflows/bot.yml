@@ -30,6 +30,9 @@ on:
       langue:
         description: "Langue des streamers : fr, en, es, de, pt, it, ja, ko, ou any (toutes). Hors fr : sous-titres traduits en français"
         default: "fr"
+      scan:
+        description: "Lire les sous-titres de N clips pour trouver les vrais moments drôles (0 = non)"
+        default: "25"
       refaire:
         description: "Refaire les clips déjà traités mais jamais postés à partir de N vues (vide = non)"
         default: ""
@@ -98,6 +101,7 @@ jobs:
       HOURS: ${{ needs.check.outputs.heures || '48' }}
       STREAM_LANG: ${{ needs.check.outputs.langue || 'fr' }}
       REDO_MIN_VIEWS: ${{ inputs.refaire }}
+      SCAN_CLIPS: ${{ inputs.scan || vars.SCAN_CLIPS || '25' }}
       WHISPER_DEVICE: cpu
       WHISPER_COMPUTE: int8
       FONTCONFIG_FILE: /etc/fonts/fonts.conf   # pour le ffmpeg statique
