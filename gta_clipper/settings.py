@@ -7,6 +7,7 @@ Coût : 3 lectures, et au plus 2 écritures si quelque chose change. Bibliothèq
 from __future__ import annotations
 
 import json
+import time
 import os
 import sys
 from datetime import datetime, timezone
@@ -35,8 +36,9 @@ def _flag(v: str) -> bool | None:
     return True if v in ON else False if v in OFF else None
 
 
-def show_queue() -> None:
+def show_queue() -> list[str]:
     """Affiche les clips dont la dernière décision est « approved » (ce que Buffer prendrait)."""
+    queue: list[str] = []
     latest: dict[str, str] = {}
     for o in s3lite.list_objects("decisions/"):
         parts = o["pathname"].split("/")
@@ -51,8 +53,21 @@ def show_queue() -> None:
                     if o["pathname"].split("/")[-1].startswith("meta")]
             meta = _get(keys[0]) if keys else {}
             print(f"  À poster : {cid} · {meta.get('title') or meta.get('titre') or '?'} "
-                  f"· jeu={meta.get('game') or meta.get('jeu') or '?'}")
+                  f"· note={meta.get('click_score') or meta.get('potential') or '?'}/10 "
+                  f"· streamer={meta.get('streamer') or '?'}")
+            queue.append(cid)
     print("Décisions (dernier état par clip) :", counts)
+    return queue
+
+
+def unqueue(ids: list[str]) -> None:
+    """Remet des clips « À poster » en « À valider » (rien n'est supprimé, réversible sur le site)."""
+    for cid in ids:
+        s3lite.put(f"decisions/{cid}/{int(time.time() * 1000)}.json",
+                   json.dumps({"status": "pending", "reason": "retiré de la file (Réglages)",
+                               "at": datetime.now(timezone.utc).isoformat()}).encode(),
+                   "application/json")
+        print(f"  Retiré de la file : {cid}")
 
 
 def main() -> int:
@@ -66,8 +81,11 @@ def main() -> int:
     print("Avant :", json.dumps({"programmation": cfg, "publication": pub, "dernier_passage": last},
                                 ensure_ascii=False))
 
-    if os.environ.get("SHOW_QUEUE", "1") != "0":
-        show_queue()
+    queue = show_queue() if os.environ.get("SHOW_QUEUE", "1") != "0" else []
+    out = os.environ.get("SET_RETIRER", "").strip()
+    if out:
+        unqueue(queue if out.lower() in ("tout", "all", "*") else
+                [x.strip() for x in out.split(",") if x.strip() in queue])
 
     new = dict(cfg)
     prog = _flag(os.environ.get("SET_PROGRAMMATION", ""))

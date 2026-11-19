@@ -15,6 +15,7 @@ on:
       publish_every_min: { description: "Un post toutes les N min (10 à 720)", default: "" }
       jours: { description: "Jours des passages : tous, ou ex. lun,mar,mer (0 = dimanche)", default: "" }
       publication: { description: "Publication auto Buffer : on / off (vide = inchangé)", default: "" }
+      retirer: { description: "Remettre en « À valider » : ids séparés par des virgules, ou « tout »", default: "" }
 permissions:
   contents: read
 jobs:
@@ -41,3 +42,4 @@ jobs:
           SET_PUBLISH_EVERY_MIN: ${{ inputs.publish_every_min }}
           SET_PUBLICATION: ${{ inputs.publication }}
           SET_JOURS: ${{ inputs.jours }}
+          SET_RETIRER: ${{ inputs.retirer }}

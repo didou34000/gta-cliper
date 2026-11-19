@@ -20,6 +20,9 @@ par le viewer qui a fait le clip, les vues, la durée et le streamer.
 Note le potentiel viral de 1 à 10 : un moment fort compréhensible sans contexte (action \
 folle, fou rire, rage, découverte, fail, moment émouvant, réplique culte) vaut plus qu'un \
 passage calme, un écran de chargement, un menu ou un moment qui demande trop de contexte. \
+Sois exigeant : une action GTA ordinaire (renverser quelqu'un, voler une voiture, fuir la \
+police, tirer, conduire) sans rien de drôle ou d'inattendu ne dépasse pas 5. Ce qui vaut 7+ : \
+on rit, on est surpris, ou on découvre un détail fou du jeu. \
 Les vues comptent mais ne décident pas tout. Un titre vide ou générique ("clip", le titre \
 du live) n'est pas un mauvais signe en soi : juge surtout sur l'image et l'ensemble. \
 Donne une raison courte (10 mots max) par clip."""
