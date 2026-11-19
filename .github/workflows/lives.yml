@@ -14,8 +14,11 @@ on:
         description: "Logins Twitch précis, séparés par des virgules (vide = les plus regardés)"
         default: ""
       fenetre:
-        description: "Minutes de live lues au maximum par streamer"
+        description: "Minutes de VOD lues au maximum par streamer"
         default: "60"
+      enregistrement:
+        description: "Minutes de live enregistrées quand la VOD est réservée aux abonnés"
+        default: "40"
 
 permissions:
   contents: read
@@ -46,6 +49,7 @@ jobs:
       LIVE_TOP: ${{ inputs.top || '4' }}
       LIVE_STREAMERS: ${{ inputs.streamers }}
       LIVE_WINDOW_MIN: ${{ inputs.fenetre || '60' }}
+      LIVE_RECORD_MIN: ${{ inputs.enregistrement || '40' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -72,7 +76,7 @@ jobs:
           fi
           echo "$HOME/ffmpeg" >> "$GITHUB_PATH"
       - name: Dépendances
-        run: pip install -q -r requirements.txt && pip install -q -U "yt-dlp[default]"
+        run: pip install -q -r requirements.txt && pip install -q -U "yt-dlp[default]" streamlink
       - name: Modèles Whisper (cache)
         uses: actions/cache@v4
         with:

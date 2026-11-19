@@ -12,12 +12,19 @@ le jeu (les plus regardés), par tranches :
 
 La position lue est gardée dans R2 (lives/<vod>.json) : chaque passage reprend où le
 précédent s'était arrêté, rien n'est lu deux fois.
+
+Beaucoup de gros streamers (Squeezie, JLTomy, Kamet0…) réservent leurs VOD aux abonnés :
+pour eux, le bot enregistre directement le live public (streamlink, sans les pubs) pendant
+LIVE_RECORD_MIN minutes, en parallèle, puis lit l'enregistrement de la même façon et coupe
+les moments drôles dans le fichier enregistré.
 """
 from __future__ import annotations
 
 import json
 import logging
 import os
+import subprocess
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -119,6 +126,39 @@ def live_streams(tw, game_id: str, lang: str, n: int, only: list[str]) -> list[d
     return streams[:n]
 
 
+def vod_readable(url: str) -> tuple[bool, str]:
+    """La VOD est-elle lisible sans compte ? (souvent réservée aux abonnés pendant le live)"""
+    import yt_dlp
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "noprogress": True, "skip_download": True}) as ydl:
+            ydl.extract_info(url, download=False)
+        return True, ""
+    except Exception as e:
+        s = str(e)
+        return False, ("réservée aux abonnés" if "subscriber-only" in s else s[:150])
+
+
+def start_recording(login: str, out: Path, minutes: float) -> subprocess.Popen:
+    """Enregistre le live public (sans pubs) pendant `minutes`, en tâche de fond."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    h, m = divmod(int(minutes), 60)
+    # Streamlink filtre lui-même les pubs Twitch. 720p : 3 à 4 enregistrements parallèles
+    # de 40 min tiennent sur le disque d'un serveur GitHub (≈ 1,5 Go chacun).
+    cmd = ["streamlink", "--hls-duration", f"{h:02d}:{m:02d}:00",
+           "--retry-streams", "10", "--retry-max", "3",
+           "-o", str(out), "--force", f"https://www.twitch.tv/{login}", "720p60,720p,best"]
+    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+
+def cut_local(src: Path, out: Path, a: float, b: float) -> Path:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{a:.2f}", "-to", f"{b:.2f}",
+                    "-i", str(src), "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+                    "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(out)],
+                   check=True, capture_output=True)
+    return out
+
+
 def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
     from . import youtube
     from .pipeline import _budget_stop, _make_clip, _prune, game_label, seen_ids, slug
@@ -129,6 +169,7 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
     top = int(os.environ.get("LIVE_TOP") or lc.get("top", 4))
     only = [s.strip().lower() for s in (os.environ.get("LIVE_STREAMERS") or "").split(",") if s.strip()]
     window = float(os.environ.get("LIVE_WINDOW_MIN") or lc.get("window_minutes", 60)) * 60
+    rec_min = float(os.environ.get("LIVE_RECORD_MIN") or lc.get("record_minutes", 40))
     min_fun = int(os.environ.get("LIVE_MIN") or lc.get("min_score", 7))
     per = int(lc.get("max_clips_per_streamer", 2))
     lag = float(lc.get("lag_seconds", 90))  # la fin de la VOD d'un live arrive avec un peu de retard
@@ -149,6 +190,52 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
     rep.beat("running", "Lecture des lives", f"{top} lives FR sur {game}", node="twitch")
     work = Path(cfg["paths"]["work"])
     produced: list[Path] = []
+    wc = cfg["whisper"]
+    model = cfg.get("llm", {}).get("live_model") or cfg.get("llm", {}).get("moments_model",
+                                                                          "claude-haiku-5-5")
+    recs: list[tuple[dict, Path, subprocess.Popen, float]] = []
+
+    def analyse(name: str, title: str, audio: Path, offset: float, make_video, sid0: str,
+                source_url, already: set) -> None:
+        """Transcrit, fait noter par Claude, monte les moments ≥ min_fun."""
+        info = rep.streamer(name)
+        samples = media.load_audio(audio)
+        peaks = youtube.loudness_peaks(samples)
+        segs = youtube.rough_transcript(
+            samples, cfg.get("youtube", {}).get("analysis_model", "small"), wc["device"],
+            wc["compute_type"], prompt=f"Live Twitch de {name} en français sur {game}. {title}")
+        seg_dur = len(samples) / 16000
+        del samples
+        rep.event(f"{len(segs)} phrases transcrites ({youtube._ts(seg_dur)} de live), "
+                  f"{len(peaks)} pic(s) de volume", node="transcription")
+        if skip_llm or not segs:
+            return
+        moments = youtube.pick_moments(
+            segs, peaks, per + 1, title=title, channel=name, game=game, model=model,
+            duration=seg_dur, system=LIVE_SYSTEM.format(game=game), fallback=False)
+        if moments:
+            rep.event(f"Moments lus : " + " · ".join(
+                f"{youtube._ts(offset + m['start'])} {m['score']}/10 ({m.get('sujet') or '?'} : "
+                f"{(m.get('raison') or '')[:90]})" for m in moments), node="scoring", force=True)
+        good = [m for m in moments if m["score"] >= min_fun][:per]
+        if not good:
+            rep.event(f"Aucun moment drôle à {min_fun}/10 ou plus dans cette tranche",
+                      node="scoring", force=True)
+            info["etat"] = "non retenu"
+            return
+        for k, m in enumerate(good, 1):
+            a, b = m["start"], m["end"]
+            sid = f"{sid0}-{int(offset + a) // 60 * 60}"
+            if slug(sid) in already or sid in already:
+                continue
+            label = f"moment drôle {k}/{len(good)} « {m.get('sujet', '')} » ({m['score']}/10 au live)"
+            _make_clip(cfg, rep, produced, already, sid=sid, name=name, label=label,
+                       video_fn=lambda a=a, b=b, sid=sid: make_video(a, b, work / sid / "source.mp4"),
+                       twitch_title=(m.get("sujet") or title)[:80],
+                       source_url=source_url(offset + a), skip_llm=skip_llm,
+                       extra={"kind": "live", "fun_score": m["score"],
+                              "potential_reason": m.get("raison", "")})
+
     try:
         tw = TwitchClient()
         game_id = tw.game_id(cfg["game_name"])
@@ -165,80 +252,72 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
             node="twitch", force=True)
         already = seen_ids(cfg) | seen_on_site()
         _prune(cfg, rep)
-        wc = cfg["whisper"]
-        model = cfg.get("llm", {}).get("live_model") or cfg.get("llm", {}).get("moments_model",
-                                                                              "claude-haiku-5-5")
+
+        # 1) Qui a une VOD lisible ? Les autres : on enregistre le live tout de suite.
+        vod_jobs = []
         for s in streams:
             name = s["user_name"]
             rep.current = name
-            info = rep.streamer(name)
-            info["etat"] = "en cours"
+            rep.streamer(name)["etat"] = "en cours"
             vods = tw._get("/videos", {"user_id": s["user_id"], "type": "archive", "first": 1}).get("data", [])
             started = s.get("started_at", "")
-            if not vods or (started and _ts_of(vods[0].get("created_at", "")) < _ts_of(started) - 600):
-                rep.event(f"[{name}] Pas de rediffusion du live en cours (VOD désactivées) : impossible "
-                          f"de le lire", node="twitch", level="warn", force=True)
-                info["etat"] = "non retenu"
+            ok, why = False, "pas de rediffusion"
+            if vods and not (started and _ts_of(vods[0].get("created_at", "")) < _ts_of(started) - 600):
+                ok, why = vod_readable(vods[0]["url"])
+            if ok:
+                vod_jobs.append((s, vods[0]))
                 continue
-            v = vods[0]
+            out = work / f"rec-{s['user_login']}" / f"{int(time.time())}.ts"
+            recs.append((s, out, start_recording(s["user_login"], out, rec_min), time.time()))
+            rep.event(f"VOD {why} : j'enregistre son live pendant {rec_min:.0f} min",
+                      node="twitch", force=True)
+
+        # 2) Pendant les enregistrements : lecture des VOD lisibles.
+        for s, v in vod_jobs:
+            name = s["user_name"]
+            rep.current = name
             dur = parse_twitch_duration(v["duration"])
             end = max(0.0, dur - lag)
-            pos = _read_pos(v["id"])
-            start = max(pos, end - window, 0.0)
+            start = max(_read_pos(v["id"]), end - window, 0.0)
             if end - start < 120:
-                rep.event(f"[{name}] Rien de neuf depuis le dernier passage", node="twitch")
-                info["etat"] = "non retenu"
+                rep.event(f"Rien de neuf depuis le dernier passage", node="twitch")
                 continue
-            rep.event(f"[{name}] Lecture du live de {youtube._ts(start)} à {youtube._ts(end)} "
-                      f"(« {v['title'][:80]} »)", node="twitch", force=True)
-            sid0 = f"live-{v['id']}"
+            rep.event(f"Lecture de la VOD du live de {youtube._ts(start)} à "
+                      f"{youtube._ts(end)} (« {v['title'][:80]} »)", node="twitch", force=True)
             try:
-                audio = download_vod_audio(v["url"], work / f"{sid0}-{int(start)}" / "audio", start, end)
-                samples = media.load_audio(audio)
+                audio = download_vod_audio(v["url"], work / f"live-{v['id']}-{int(start)}" / "audio",
+                                           start, end)
             except Exception as e:
                 rep.stats["erreurs"] += 1
-                rep.event(f"[{name}] Son du live illisible : {str(e)[:200]}", level="error", force=True)
+                rep.event(f"Son de la VOD illisible : {str(e)[:200]}", level="error", force=True)
                 continue
-            peaks = youtube.loudness_peaks(samples)
-            segs = youtube.rough_transcript(
-                samples, cfg.get("youtube", {}).get("analysis_model", "small"), wc["device"],
-                wc["compute_type"], prompt=f"Live Twitch de {name} en français sur {game}. {v['title']}")
-            seg_dur = len(samples) / 16000
-            del samples
-            rep.event(f"[{name}] {len(segs)} phrases transcrites, {len(peaks)} pic(s) de volume",
-                      node="transcription")
-            if skip_llm or not segs:
-                _save_pos(v["id"], end)
-                continue
-            moments = youtube.pick_moments(
-                segs, peaks, per + 1, title=v["title"], channel=name, game=game, model=model,
-                duration=seg_dur, system=LIVE_SYSTEM.format(game=game), fallback=False)
             _save_pos(v["id"], end)
-            if moments:
-                rep.event(f"[{name}] Moments lus : " + " · ".join(
-                    f"{youtube._ts(start + m['start'])} {m['score']}/10 ({m.get('sujet') or '?'} : "
-                    f"{(m.get('raison') or '')[:90]})" for m in moments), node="scoring", force=True)
-            good = [m for m in moments if m["score"] >= min_fun][:per]
-            if not good:
-                rep.event(f"[{name}] Aucun moment drôle à {min_fun}/10 ou plus dans cette tranche",
-                          node="scoring", force=True)
-                info["etat"] = "non retenu"
+            analyse(name, v["title"], audio, start,
+                    lambda a, b, out, v=v, start=start: media.download(
+                        v["url"], out, start + a, start + b,
+                        max_mb=Guard.get().limits["max_download_mb"]),
+                    f"live-{v['id']}", lambda t, v=v: f"{v['url']}?t={int(t)}s", already)
+
+        # 3) Enregistrements : on attend la fin, puis même lecture sur le fichier.
+        for s, out, proc, t0 in recs:
+            name = s["user_name"]
+            rep.current = name
+            try:
+                _, err = proc.communicate(timeout=max(60, rec_min * 60 + 300 - (time.time() - t0)))
+            except subprocess.TimeoutExpired:
+                proc.terminate()
+                _, err = proc.communicate()
+            if not out.exists() or out.stat().st_size < 5_000_000:
+                rep.stats["erreurs"] += 1
+                rep.event(f"Enregistrement du live raté : "
+                          f"{(err or b'').decode(errors='ignore')[-200:]}", level="error", force=True)
                 continue
-            for k, m in enumerate(good, 1):
-                a, b = start + m["start"], start + m["end"]
-                sid = f"{sid0}-{int(a) // 60 * 60}"
-                if slug(sid) in already or sid in already:
-                    continue
-                label = f"moment drôle {k}/{len(good)} à {youtube._ts(a)} « {m.get('sujet', '')} » " \
-                        f"({m['score']}/10 au live)"
-                _make_clip(cfg, rep, produced, already, sid=sid, name=name, label=label,
-                           video_fn=lambda a=a, b=b, sid=sid: media.download(
-                               v["url"], work / sid / "source.mp4", a, b,
-                               max_mb=Guard.get().limits["max_download_mb"]),
-                           twitch_title=(m.get("sujet") or v["title"])[:80],
-                           source_url=f"{v['url']}?t={int(a)}s", skip_llm=skip_llm,
-                           extra={"kind": "live", "fun_score": m["score"],
-                                  "potential_reason": m.get("raison", ""), "vod_start": a})
+            rep.event(f"Live enregistré ({out.stat().st_size / 1e9:.1f} Go)", node="twitch")
+            analyse(name, s.get("title", ""), out, 0.0,
+                    lambda a, b, dst, out=out: cut_local(out, dst, a, b),
+                    f"rec-{s['user_login']}-{int(t0)}",
+                    lambda t, s=s: f"https://www.twitch.tv/{s['user_login']}", already)
+            out.unlink(missing_ok=True)
     except LimitReached as e:
         rep.event(f"Garde-fou : {e}", level="warn", force=True)
     except Exception as e:
@@ -248,6 +327,9 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
         rep.beat("error", "Lecture des lives en échec", str(e)[:300], with_logs=True)
         raise
     finally:
+        for _, _, proc, _ in recs:
+            if proc.poll() is None:
+                proc.terminate()
         for info_s in rep.streamers.values():
             if info_s.get("etat") == "en cours":
                 info_s["etat"] = "fini" if info_s.get("produits") else "non retenu"
