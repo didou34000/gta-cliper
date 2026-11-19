@@ -264,7 +264,10 @@ montre pas clairement l'action ou la réaction.
     ["Barème :", ""]) + """
 En plus :
 - Le nombre de vues Twitch est un signal des viewers : un clip très peu vu (moins de 100 vues) \
-dépasse rarement 6, sauf si l'image montre un moment évidemment fort.
+dépasse rarement 6, sauf si l'image montre un moment évidemment fort. À l'inverse, un clip \
+très vu (1 500 vues ou plus) est un moment que des milliers de viewers ont trouvé fort : \
+pars de 7 et ne descends que si l'image montre clairement qu'il ne se passe rien \
+(menu, écran noir, chargement, discussion hors jeu).
 - 7 = je le posterais sans hésiter sur un compte qui vise des millions de vues. Sinon 6 ou moins."""
 
 

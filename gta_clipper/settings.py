@@ -60,6 +60,19 @@ def show_queue() -> list[str]:
     return queue
 
 
+def show_today() -> None:
+    """Liste les clips montés aujourd'hui (UTC) : streamer, vues, note, raison, titre, vidéo."""
+    day = datetime.now(timezone.utc).strftime("%Y%m%d")
+    metas = [o for o in s3lite.list_objects(f"clips/{day}")
+             if o["pathname"].split("/")[-1].startswith("meta")]
+    print(f"Clips montés aujourd'hui ({day}) : {len(metas)}")
+    for o in sorted(metas, key=lambda o: o["pathname"]):
+        m = _get(o["pathname"])
+        print(f"  {o['pathname'].split('/')[1]} · {m.get('streamer', '?')} · {m.get('views', '?')} vues "
+              f"· note {m.get('click_score', '?')}/10 (Haiku {m.get('click_score_haiku', '-')}) "
+              f"· {m.get('click_reason', '')} · « {m.get('title', '')} » · {m.get('video_url', '')}")
+
+
 def unqueue(ids: list[str]) -> None:
     """Remet des clips « À poster » en « À valider » (rien n'est supprimé, réversible sur le site)."""
     for cid in ids:
@@ -82,6 +95,11 @@ def main() -> int:
                                 ensure_ascii=False))
 
     queue = show_queue() if os.environ.get("SHOW_QUEUE", "1") != "0" else []
+    if os.environ.get("SHOW_TODAY", "1") != "0":
+        try:
+            show_today()
+        except Exception as e:
+            print("Liste du jour illisible :", e)
     out = os.environ.get("SET_RETIRER", "").strip()
     if out:
         unqueue(queue if out.lower() in ("tout", "all", "*") else
