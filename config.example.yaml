@@ -155,7 +155,8 @@ youtube:
 # lives FR en cours (via la VOD du live) et ne clippe que les moments drôles.
 lives:
   top: 4                     # lives regardés à chaque passage (les plus regardés)
-  window_minutes: 60         # tranche lue au maximum par live et par passage
+  window_minutes: 60         # tranche de VOD lue au maximum par live et par passage
+  record_minutes: 40         # VOD réservée aux abonnés : durée d'enregistrement du live public
   min_score: 7               # note minimale (lecture de la transcription) pour monter le clip
   max_clips_per_streamer: 2
   lag_seconds: 90
