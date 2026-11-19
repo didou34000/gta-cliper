@@ -673,6 +673,8 @@ def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, pr
     from .twitch import fetch_chat_offsets_gql, load_chat_offsets
     pool: list[dict] = []
     min_dur = float(cfg.get("min_clip_duration", 20))
+    if os.environ.get("REDO_MIN_VIEWS"):  # mode « refaire » : les gros clips courts (Squeezie…) passent aussi
+        min_dur = min(min_dur, 10.0)
     for idx, st in enumerate(cfg["streamers"], 1):
         name = rep.current = st["name"]
         info = rep.streamer(name)
