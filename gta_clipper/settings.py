@@ -62,12 +62,17 @@ def show_queue() -> list[str]:
 
 def show_today() -> None:
     """Liste les clips montés aujourd'hui (UTC) : streamer, vues, note, raison, titre, vidéo."""
-    day = datetime.now(timezone.utc).strftime("%Y%m%d")
-    metas = [o for o in s3lite.list_objects(f"clips/{day}")
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    day = now.strftime("%Y%m%d")
+    yday = (now - timedelta(days=1)).strftime("%Y%m%d")
+    metas = [o for p in (yday, day) for o in s3lite.list_objects(f"clips/{p}")
              if o["pathname"].split("/")[-1].startswith("meta")]
-    print(f"Clips montés aujourd'hui ({day}) : {len(metas)}")
+    print(f"Clips montés hier et aujourd'hui ({yday}-{day}) : {len(metas)} (hier : seulement ≥ 1000 vues)")
     for o in sorted(metas, key=lambda o: o["pathname"]):
         m = _get(o["pathname"])
+        if o["pathname"].split("/")[1].startswith(yday) and (m.get("views") or 0) < 1000:
+            continue
         print(f"  {o['pathname'].split('/')[1]} · {m.get('streamer', '?')} · {m.get('views', '?')} vues "
               f"· note {m.get('click_score', '?')}/10 (Haiku {m.get('click_score_haiku', '-')}) "
               f"· {m.get('click_reason', '')} · « {m.get('title', '')} » · {m.get('video_url', '')}")
