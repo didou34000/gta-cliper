@@ -895,6 +895,18 @@ def _scan_and_make(cfg, rep, work, produced, already, pool, scan_n, game):
         for c in ranked[:12]), node="scoring", force=True)
     min_fun = int(os.environ.get("SCAN_MIN") or cfg.get("scan_min", 7))
     keep = [c for c in ranked if c["score"] >= min_fun]
+    # Les clips lus et pas assez drôles sont marqués « vus » : le passage suivant lit un
+    # nouveau lot au lieu de retranscrire les mêmes.
+    from .remote import enabled, put
+    if enabled():
+        for c in ranked:
+            if c["score"] < min_fun and c.get("words") is not None:
+                try:
+                    put(f"seen/{slug(c['sid'])}.json", b"{}", "application/json",
+                        random_suffix=False, important=True)
+                    already.add(c["sid"])
+                except Exception as e:
+                    log.info("Repère « vu » non écrit pour %s : %s", c["sid"], e)
     if not keep:
         rep.event(f"Aucun clip drôle à {min_fun}/10 ou plus dans ce lot : rien n'est monté",
                   node="scoring", force=True)
