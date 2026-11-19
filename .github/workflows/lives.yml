@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   lives:
-    if: ${{ vars.STOP != '1' && vars.LIVES != '0' }}
+    if: ${{ vars.STOP != '1' && vars.LIVES != 'off' }}
     runs-on: ubuntu-latest
     timeout-minutes: 100
     concurrency:
