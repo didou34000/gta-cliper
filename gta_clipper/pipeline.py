@@ -339,11 +339,23 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
         top = boxes.make_box(top_txt, item_dir / "box_top.png", size=66)
         bottom = boxes.make_box(meta.get("box_bottom", ""), item_dir / "box_bottom.png", size=52,
                                 max_lines=1)
+        # 19/11 : sous-titres mot à mot remis sous le jeu, entre la vidéo et l'encadré du bas.
+        ass = None
+        if rc.get("box_subtitles", True) and words:
+            sc = cfg["subtitles"]
+            vy = (rc["height"] - render.BOX_VIDEO_H) // 2
+            ass = subtitles.build_ass(
+                words, item_dir / "subs.ass", width=rc["width"], height=rc["height"],
+                font=sc["font"], font_size=int(rc.get("box_sub_size", 86)), per_line=sc["words_per_line"],
+                color=sc["color"], highlight=sc["highlight_color"], outline=sc["outline"],
+                outline_color=sc.get("outline_color", "&H003D0A2A"), max_width=int(rc["width"] * 0.9),
+                pos_y=vy + render.BOX_VIDEO_H + 95, uppercase=sc["uppercase"], hook="",
+                hook_duration=duration, time_offset=start)
         beat("render", f"Montage {rc['width']}×{rc['height']} : encadré « {top_txt} »"
                        + (f" + réaction « {meta.get('box_bottom')} »" if bottom else "")
-                       + ", sans sous-titres")
+                       + (" + sous-titres" if ass else ", sans sous-titres"))
         render.render_boxes(video, out, top, bottom, width=rc["width"], height=rc["height"],
-                            start=start, duration=duration)
+                            start=start, duration=duration, ass=ass)
     else:
         _render_subtitled(cfg, meta, words, item_dir, video, out, start, duration, beat)
     cover_ok = False
