@@ -163,8 +163,16 @@ BOX_VIDEO_H = 700  # hauteur du jeu sur 1920 (léger zoom : les bords gauche/dro
 
 def render_boxes(src: Path, out: Path, top: Path | None, bottom: Path | None, *,
                  width: int = 1080, height: int = 1920,
-                 start: float = 0.0, duration: float | None = None) -> Path:
+                 start: float = 0.0, duration: float | None = None,
+                 ass: Path | None = None) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
+    workdir = out.parent
+    if ass:
+        if ass.resolve() != (workdir / "subs.ass").resolve():
+            shutil.copy(ass, workdir / "subs.ass")
+        from .subtitles import FONTS_DIR
+        if FONTS_DIR.is_dir():
+            shutil.copytree(FONTS_DIR, workdir / "fonts", dirs_exist_ok=True)
     vh = BOX_VIDEO_H
     vy = (height - vh) // 2
     inputs = ["-i", str(src.resolve())]
@@ -180,9 +188,10 @@ def render_boxes(src: Path, out: Path, top: Path | None, bottom: Path | None, *,
         last, n = f"v{n}", n + 1
     if bottom:
         inputs += ["-i", str(bottom.resolve())]
-        g += f";[{last}][{n}:v]overlay=(W-w)/2:{vy + vh + 170}[v{n}]"
+        g += f";[{last}][{n}:v]overlay=(W-w)/2:{vy + vh + (210 if ass else 170)}[v{n}]"
         last, n = f"v{n}", n + 1
-    g += f";[{last}]setsar=1,format=yuv420p[v]"
+    subs = "ass=subs.ass:fontsdir=fonts," if ass else ""
+    g += f";[{last}]{subs}setsar=1,format=yuv420p[v]"
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
     if start:
         cmd += ["-ss", f"{start:.3f}"]
@@ -193,5 +202,5 @@ def render_boxes(src: Path, out: Path, top: Path | None, bottom: Path | None, *,
             "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-r", "30",
             "-maxrate", "4M", "-bufsize", "8M",
             "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(out.resolve())]
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, cwd=workdir)
     return out

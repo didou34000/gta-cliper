@@ -93,6 +93,7 @@ render:
   width: 1080
   height: 1920
   style: boxes          # boxes = encadrés blancs + emojis, sans sous-titres (18/11) ; subtitles = ancien style
+  box_subtitles: true          # sous-titres mot à mot sous le jeu (style boxes), false = sans
   layout: blur          # blur = jeu entier au centre + fond flou ; crop = zoom plein écran
   # Facecam (optionnel) : zone de la webcam dans la source 1920x1080, en pixels.
   # Si renseignée, elle est placée en haut de la vidéo verticale.
