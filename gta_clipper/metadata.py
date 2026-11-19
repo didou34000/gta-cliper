@@ -78,8 +78,14 @@ bout, et a-t-il envie de partager ou commenter ? Juge sur les images et la trans
 sur le titre Twitch.
 - 9-10 : moment exceptionnel et immédiatement lisible (réaction énorme, découverte marquante \
 d'une nouveauté du jeu, fail ou bug hilarant, action folle), fort dès les 3 premières secondes.
-- 7-8 : moment fort clair, compréhensible sans contexte, avec une vraie réaction du streamer.
-- 5-6 : correct mais banal (il conduit, il se balade, il commente calmement).
+- 7-8 : moment vraiment DRÔLE ou SURPRENANT, compréhensible sans contexte : on rit, on est \
+bluffé ou on apprend un truc fou sur le jeu, et le streamer réagit fort (fou rire, cri, rage, \
+phrase culte).
+- 5-6 : correct mais banal. Les actions GTA ordinaires sont banales même bien filmées : \
+renverser un piéton ou un cycliste, voler une voiture, fuir la police, tirer sur des PNJ, \
+conduire, se balader, commenter calmement. Elles ne dépassent 6 que si quelque chose \
+d'absurde, d'inattendu ou d'hilarant se passe en plus (règle du 19/11 : « pas juste un moment \
+où il renverse un mec, des moments drôles, intéressants »).
 - 1-4 : rien ne se passe, écran de chargement, menu, pause, discussion avec le chat sans \
 rapport, moment qui demande trop de contexte, image illisible, ou images qui ne montrent pas \
 le jeu indiqué (ex. un autre jeu, ou un ancien GTA alors que le jeu est GTA 6).
