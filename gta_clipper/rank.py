@@ -94,5 +94,7 @@ def rank_candidates(cands: list[dict], game: str = "", model: str = "claude-haik
         s = scores.get(i)
         c["score"] = max(1, min(10, s.score)) if s else 0
         c["raison"] = s.raison[:80] if s else ""
-    # Le potentiel d'abord ; à égalité, les vues.
-    return sorted(cands, key=lambda c: (c.get("score", 0), c["views"]), reverse=True)
+    # 19/11 : les vues Twitch d'abord (un clip à 4 000 vues est un moment que les viewers ont
+    # déjà validé, la miniature seule ne le montre pas). La note sur miniature sert seulement
+    # à écarter le déchet évident (3/10 ou moins : menu, écran noir, autre jeu).
+    return sorted(cands, key=lambda c: (c.get("score", 0) > 3, c["views"]), reverse=True)
