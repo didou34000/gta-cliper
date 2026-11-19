@@ -30,6 +30,9 @@ on:
       langue:
         description: "Langue des streamers : fr, en, es, de, pt, it, ja, ko, ou any (toutes). Hors fr : sous-titres traduits en français"
         default: "fr"
+      refaire:
+        description: "Refaire les clips déjà traités mais jamais postés à partir de N vues (vide = non)"
+        default: ""
 
 permissions:
   contents: read
@@ -94,6 +97,7 @@ jobs:
       MIN_VIEWS: ${{ needs.check.outputs.min_views || '200' }}
       HOURS: ${{ needs.check.outputs.heures || '48' }}
       STREAM_LANG: ${{ needs.check.outputs.langue || 'fr' }}
+      REDO_MIN_VIEWS: ${{ inputs.refaire }}
       WHISPER_DEVICE: cpu
       WHISPER_COMPUTE: int8
       FONTCONFIG_FILE: /etc/fonts/fonts.conf   # pour le ffmpeg statique

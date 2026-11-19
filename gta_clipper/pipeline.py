@@ -644,6 +644,29 @@ def _run(cfg: dict, skip_llm: bool, chat_dir: str | None, rep) -> list[Path]:
     return produced
 
 
+# Clips déjà publiés sur TikTok le 18/11 (vérifié dans Buffer) : jamais refaits, pas de doublon.
+POSTED_SLUGS = {
+    "refinedvibrantmeerkatuwot", "peacefulzealousmonkeydancingbanana",
+    "evilphilanthropicdurianfailfish", "innocentcoyauberginefailfish",
+    "tastylivelygorillakappaross", "dirtyspoopysrirachasupervinlin",
+    "smalltallcatsupervinlin", "covertpoiseddotterelpupper",
+    "furryantsyramenjoncarnage", "wealthynimblehamsterdansgame",
+}
+
+
+def _redo(c, sid: str) -> bool:
+    """Mode « refaire » : un gros clip déjà traité (noté avec l'ancienne grille, jamais posté)
+    repasse dans la sélection s'il a au moins REDO_MIN_VIEWS vues."""
+    try:
+        n = int(os.environ.get("REDO_MIN_VIEWS") or 0)
+    except ValueError:
+        return False
+    if n <= 0 or c.view_count < n:
+        return False
+    s = slug(sid)
+    return not any(p in s for p in POSTED_SLUGS)
+
+
 def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, produced,
                     hours, min_views, retry: bool = False):
     """Renvoie None quand rien de neuf n'a été trouvé et qu'on peut réessayer plus large."""
@@ -681,7 +704,7 @@ def _streamers_loop(cfg, skip_llm, chat_dir, rep, tw, game_id, already, work, pr
             node="scoring")
         for c in clips:
             sid = f"clip-{c.id}"
-            if sid in already or slug(sid) in already:
+            if (sid in already or slug(sid) in already) and not _redo(c, sid):
                 info["deja_faits"] += 1
                 continue
             pool.append({"clip": c, "sid": sid, "streamer": name, "views": c.view_count,
