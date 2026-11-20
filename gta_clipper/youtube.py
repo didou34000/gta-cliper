@@ -215,7 +215,7 @@ class Moments(BaseModel):
 def pick_moments(segs: list[Seg], peaks: list[Peak], n: int, *, title: str = "",
                  channel: str = "", game: str = "", model: str = "claude-haiku-5-5",
                  duration: float = 0, found: dict | None = None, system: str = "",
-                 fallback: bool = True) -> list[dict]:
+                 fallback: bool = True, extra: str = "") -> list[dict]:
     """Demande à Claude les n meilleurs moments. Sans clé / en cas d'échec : pics de volume.
     Si `found` est fourni, on y range le jeu reconnu par Claude (found["jeu"])."""
     from .guard import Guard
@@ -225,6 +225,7 @@ def pick_moments(segs: list[Seg], peaks: list[Peak], n: int, *, title: str = "",
         msg = (f"Vidéo : « {title} » · chaîne : {channel or '?'} · jeu supposé : {game or '?'} · "
                f"durée {_ts(duration)}.\nDonne les {n + 2} meilleurs moments, du meilleur au "
                f"moins bon (temps en secondes).\n\nPics de volume : {pk}\n\n"
+               + (f"{extra}\n\n" if extra else "") +
                f"Transcription :\n{lines[:400_000]}")
         try:
             import anthropic

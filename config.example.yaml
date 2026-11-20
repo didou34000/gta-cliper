@@ -160,6 +160,7 @@ lives:
   min_score: 7               # note minimale (lecture de la transcription) pour monter le clip
   max_clips_per_streamer: 2
   lag_seconds: 90
+  use_vod: false             # false = on enregistre tous les lives pour lire aussi le chat (pics de rires)
 
 paths:
   work: data/work
