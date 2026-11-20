@@ -53,7 +53,9 @@ pic (×4 ou plus) prouve que des milliers de viewers ont ri ou halluciné : c'es
 indice. Cherche ce qui se passe juste AVANT et pendant chaque gros pic, place le moment pour \
 qu'il finisse sur la réaction, et note-le au moins 7 si la transcription montre une action ou \
 une réaction claire à cet endroit (8-9 si le pic est énorme, ×8 ou plus). Sans pic de chat, \
-un passage ne dépasse 7 que si la réplique est vraiment culte à l'écrit.
+un passage ne dépasse 7 que si la réplique est vraiment culte à l'écrit. Le chat ne rattrape \
+JAMAIS un moment interdit : nudité, femme nue, contenu sexuel, strip-club valent toujours 1, \
+même si le chat explose.
 
 Note de 1 à 10, sois très exigeant (la plupart des passages valent 3 à 5) :
 - 9-10 : on pleure de rire, réplique culte ou situation folle compréhensible sans contexte ;

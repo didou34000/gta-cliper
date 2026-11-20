@@ -272,7 +272,8 @@ pars de 7 et ne descends que si l'image montre clairement qu'il ne se passe rien
 Twitch. Un gros pic de rires (×4 la normale ou plus) vaut autant qu'un clip très vu : des \
 milliers de viewers ont réagi à ce qu'ils voyaient. Pars de 7 et ne descends que si l'image \
 montre clairement qu'il ne se passe rien. Un écran sombre ou une scène confuse n'est pas une \
-raison suffisante si le chat a explosé.
+raison suffisante si le chat a explosé. Mais nudité, personnage nu, contenu sexuel ou strip-club : \
+toujours 1, même avec un énorme pic de chat (interdit sur TikTok).
 - 7 = je le posterais sans hésiter sur un compte qui vise des millions de vues. Sinon 6 ou moins."""
 
 
