@@ -268,12 +268,18 @@ dépasse rarement 6, sauf si l'image montre un moment évidemment fort. À l'inv
 très vu (1 500 vues ou plus) est un moment que des milliers de viewers ont trouvé fort : \
 pars de 7 et ne descends que si l'image montre clairement qu'il ne se passe rien \
 (menu, écran noir, chargement, discussion hors jeu).
+- Pour un moment pris en direct sur un live, on te donne à la place la réaction du chat \
+Twitch. Un gros pic de rires (×4 la normale ou plus) vaut autant qu'un clip très vu : des \
+milliers de viewers ont réagi à ce qu'ils voyaient. Pars de 7 et ne descends que si l'image \
+montre clairement qu'il ne se passe rien. Un écran sombre ou une scène confuse n'est pas une \
+raison suffisante si le chat a explosé.
 - 7 = je le posterais sans hésiter sur un compte qui vise des millions de vues. Sinon 6 ou moins."""
 
 
 def judge_click(streamer: str, game: str, frames: list, frame_times: list[float] | None,
                 transcript: str, twitch_title: str = "", views: int | None = None,
-                duration: float = 0.0, model: str = "claude-sonnet-5-5") -> Judge | None:
+                duration: float = 0.0, model: str = "claude-sonnet-5-5",
+                chat_note: str = "") -> Judge | None:
     """Note de clic finale par un modèle plus fort, avec plus d'images (≈ 1,5-2 centimes)."""
     import base64
     from .guard import Guard
@@ -289,6 +295,7 @@ def judge_click(streamer: str, game: str, frames: list, frame_times: list[float]
         f"Streamer : {streamer}\nJeu : {game or '(non précisé)'}\n"
         + (f"Durée : {duration:.0f} s\n" if duration else "")
         + (f"Vues du clip sur Twitch : {views}\n" if views is not None else "")
+        + (f"Réaction du chat Twitch pendant ce moment du live : {chat_note}\n" if chat_note else "")
         + f"Titre Twitch : {twitch_title or '(aucun)'}\n\n"
         f"Transcription (auto) :\n<transcription>\n{(transcript or '(pas de parole)')[:3000]}\n</transcription>")})
     client = anthropic.Anthropic(max_retries=2, timeout=90)

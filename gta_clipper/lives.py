@@ -28,6 +28,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import chat as chatmod
 from . import media
 from .guard import Guard, LimitReached
 
@@ -45,6 +46,14 @@ Règles :
 - chaque moment dure 20 à 60 secondes et se comprend SANS le reste du live ;
 - il commence juste avant l'action ou la phrase d'accroche et finit sur la chute ou la réaction ;
 - pas de chevauchement entre deux moments.
+
+Le chat Twitch : on te donne aussi les pics de rires du chat (MDR, KEKW, 😂… comparés à la \
+normale). La transcription ne voit pas l'image ; le chat, lui, réagit à ce qu'il VOIT. Un gros \
+pic (×4 ou plus) prouve que des milliers de viewers ont ri ou halluciné : c'est ton meilleur \
+indice. Cherche ce qui se passe juste AVANT et pendant chaque gros pic, place le moment pour \
+qu'il finisse sur la réaction, et note-le au moins 7 si la transcription montre une action ou \
+une réaction claire à cet endroit (8-9 si le pic est énorme, ×8 ou plus). Sans pic de chat, \
+un passage ne dépasse 7 que si la réplique est vraiment culte à l'écrit.
 
 Note de 1 à 10, sois très exigeant (la plupart des passages valent 3 à 5) :
 - 9-10 : on pleure de rire, réplique culte ou situation folle compréhensible sans contexte ;
@@ -173,6 +182,9 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
     min_fun = int(os.environ.get("LIVE_MIN") or lc.get("min_score", 7))
     per = int(lc.get("max_clips_per_streamer", 2))
     lag = float(lc.get("lag_seconds", 90))  # la fin de la VOD d'un live arrive avec un peu de retard
+    # Règle du 20/11 : on enregistre tous les lives (même ceux dont la VOD est lisible) pour lire
+    # le chat en même temps, ce que la VOD ne permet pas. LIVE_VOD=1 remet l'ancienne lecture.
+    use_vod = (os.environ.get("LIVE_VOD") or str(lc.get("use_vod", ""))).lower() in ("1", "true", "yes")
 
     guard = Guard(cfg, Path(cfg["paths"]["work"]).parent / "usage.json")
     rep = Reporter()
@@ -193,10 +205,10 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
     wc = cfg["whisper"]
     model = cfg.get("llm", {}).get("live_model") or cfg.get("llm", {}).get("moments_model",
                                                                           "claude-haiku-5-5")
-    recs: list[tuple[dict, Path, subprocess.Popen, float]] = []
+    recs: list[tuple[dict, Path, subprocess.Popen, float, chatmod.ChatLog]] = []
 
     def analyse(name: str, title: str, audio: Path, offset: float, make_video, sid0: str,
-                source_url, already: set) -> None:
+                source_url, already: set, log_chat=None) -> None:
         """Transcrit, fait noter par Claude, monte les moments ≥ min_fun."""
         info = rep.streamer(name)
         samples = media.load_audio(audio)
@@ -208,15 +220,31 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
         del samples
         rep.event(f"{len(segs)} phrases transcrites ({youtube._ts(seg_dur)} de live), "
                   f"{len(peaks)} pic(s) de volume", node="transcription")
+        spk: list = []
+        if log_chat is not None:
+            spk = chatmod.spikes(log_chat.messages, seg_dur)
+            rep.event(f"Chat lu : {len(log_chat.messages)} messages, {len(spk)} pic(s) de rires"
+                      + (" (" + ", ".join(f"{youtube._ts(x.t)} ×{x.ratio}" for x in spk) + ")"
+                         if spk else "")
+                      + (f" · coupures : {log_chat.error}" if log_chat.error and not log_chat.messages
+                         else ""), node="scoring", force=True)
         if skip_llm or not segs:
             return
         moments = youtube.pick_moments(
             segs, peaks, per + 1, title=title, channel=name, game=game, model=model,
-            duration=seg_dur, system=LIVE_SYSTEM.format(game=game), fallback=False)
+            duration=seg_dur, system=LIVE_SYSTEM.format(game=game), fallback=False,
+            extra=chatmod.describe(spk, youtube._ts) if log_chat is not None else "")
+        for m in moments:
+            hit = chatmod.best_overlap(spk, m["start"], m["end"])
+            m["chat"] = (f"{hit.count} messages de rire en 20 s dans le chat Twitch (×{hit.ratio} "
+                         f"la normale)" + (f", ex. « {' » « '.join(hit.examples[:3])} »"
+                                          if hit.examples else "")) if hit else ""
         if moments:
             rep.event(f"Moments lus : " + " · ".join(
                 f"{youtube._ts(offset + m['start'])} {m['score']}/10 ({m.get('sujet') or '?'} : "
-                f"{(m.get('raison') or '')[:90]})" for m in moments), node="scoring", force=True)
+                f"{(m.get('raison') or '')[:90]}"
+                + (f" · chat ×{chatmod.best_overlap(spk, m['start'], m['end']).ratio}" if m.get("chat") else "")
+                + ")" for m in moments), node="scoring", force=True)
         good = [m for m in moments if m["score"] >= min_fun][:per]
         if not good:
             rep.event(f"Aucun moment drôle à {min_fun}/10 ou plus dans cette tranche",
@@ -234,7 +262,8 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
                        twitch_title=(m.get("sujet") or title)[:80],
                        source_url=source_url(offset + a), skip_llm=skip_llm,
                        extra={"kind": "live", "fun_score": m["score"],
-                              "potential_reason": m.get("raison", "")})
+                              "potential_reason": m.get("raison", ""),
+                              "chat_note": m.get("chat", "")})
 
     try:
         tw = TwitchClient()
@@ -262,14 +291,20 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
             vods = tw._get("/videos", {"user_id": s["user_id"], "type": "archive", "first": 1}).get("data", [])
             started = s.get("started_at", "")
             ok, why = False, "pas de rediffusion"
-            if vods and not (started and _ts_of(vods[0].get("created_at", "")) < _ts_of(started) - 600):
+            if not use_vod:
+                why = "non utilisée (on lit le chat en direct)"
+            elif vods and not (started and _ts_of(vods[0].get("created_at", "")) < _ts_of(started) - 600):
                 ok, why = vod_readable(vods[0]["url"])
             if ok:
                 vod_jobs.append((s, vods[0]))
                 continue
             out = work / f"rec-{s['user_login']}" / f"{int(time.time())}.ts"
-            recs.append((s, out, start_recording(s["user_login"], out, rec_min), time.time()))
-            rep.event(f"VOD {why} : j'enregistre son live pendant {rec_min:.0f} min",
+            t0 = time.time()
+            proc = start_recording(s["user_login"], out, rec_min)
+            cl = chatmod.ChatLog(s["user_login"], t0)
+            cl.start()
+            recs.append((s, out, proc, t0, cl))
+            rep.event(f"VOD {why} : j'enregistre son live et son chat pendant {rec_min:.0f} min",
                       node="twitch", force=True)
 
         # 2) Pendant les enregistrements : lecture des VOD lisibles.
@@ -299,7 +334,7 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
                     f"live-{v['id']}", lambda t, v=v: f"{v['url']}?t={int(t)}s", already)
 
         # 3) Enregistrements : on attend la fin, puis même lecture sur le fichier.
-        for s, out, proc, t0 in recs:
+        for s, out, proc, t0, cl in recs:
             name = s["user_name"]
             rep.current = name
             try:
@@ -307,6 +342,7 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
             except subprocess.TimeoutExpired:
                 proc.terminate()
                 _, err = proc.communicate()
+            cl.stop()
             if not out.exists() or out.stat().st_size < 5_000_000:
                 rep.stats["erreurs"] += 1
                 rep.event(f"Enregistrement du live raté : "
@@ -316,7 +352,8 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
             analyse(name, s.get("title", ""), out, 0.0,
                     lambda a, b, dst, out=out: cut_local(out, dst, a, b),
                     f"rec-{s['user_login']}-{int(t0)}",
-                    lambda t, s=s: f"https://www.twitch.tv/{s['user_login']}", already)
+                    lambda t, s=s: f"https://www.twitch.tv/{s['user_login']}", already,
+                    log_chat=cl)
             out.unlink(missing_ok=True)
     except LimitReached as e:
         rep.event(f"Garde-fou : {e}", level="warn", force=True)
@@ -327,7 +364,8 @@ def run_lives(cfg: dict, skip_llm: bool = False) -> list[Path]:
         rep.beat("error", "Lecture des lives en échec", str(e)[:300], with_logs=True)
         raise
     finally:
-        for _, _, proc, _ in recs:
+        for _, _, proc, _, cl in recs:
+            cl.stop()
             if proc.poll() is None:
                 proc.terminate()
         for info_s in rep.streamers.values():

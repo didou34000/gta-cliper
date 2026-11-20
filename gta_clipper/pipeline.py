@@ -275,7 +275,10 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
             # Note finale par Sonnet (règle du 16/11 : Haiku est trop généreux), avec plus
             # d'images et les vues Twitch. Seulement si Haiku met 6 ou plus : en dessous le clip
             # ne sera de toute façon pas publié (et ça garde le passage sous le plafond du jour).
-            if (meta.get("click_score") or 0) >= 6:
+            # Moment de live qui a fait exploser le chat : Sonnet le juge même si Haiku est
+            # tiède (Haiku ne voit pas la réaction des viewers).
+            chat_note = (extra or {}).get("chat_note") or ""
+            if (meta.get("click_score") or 0) >= 6 or (chat_note and (meta.get("click_score") or 0) >= 4):
                 try:
                     from .metadata import judge_click
                     nj = 16 if duration > 30 else 12
@@ -283,7 +286,8 @@ def process_clip(cfg: dict, *, source_id: str, streamer_name: str, video: Path,
                     jt = [duration * (int(f.stem) + 0.5) / nj for f in jf]
                     j = judge_click(streamer_name, game, jf, jt, text, twitch_title,
                                     (extra or {}).get("views"), duration,
-                                    cfg["llm"].get("judge_model", "claude-sonnet-5-5"))
+                                    cfg["llm"].get("judge_model", "claude-sonnet-5-5"),
+                                    chat_note=chat_note)
                     if j:
                         log.info("[%s] Note de clic : Haiku %s/10 → Sonnet %s/10 (%s)", streamer_name,
                                  meta["click_score"], j.click_score, j.click_reason)
