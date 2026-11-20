@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: read
+  actions: write   # pour se relancer lui-même (le cron de GitHub ne se déclenche presque jamais)
 
 jobs:
   lives:
@@ -51,6 +52,8 @@ jobs:
       LIVE_WINDOW_MIN: ${{ inputs.fenetre || '60' }}
       LIVE_RECORD_MIN: ${{ inputs.enregistrement || '40' }}
     steps:
+      - name: Heure de départ
+        run: echo "T0=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -91,9 +94,21 @@ jobs:
           key: usage-${{ steps.usage.outputs.day }}-${{ github.run_id }}
           restore-keys: usage-${{ steps.usage.outputs.day }}-
       - name: Lecture des lives
+        timeout-minutes: 85
         run: python -m gta_clipper lives
       - uses: actions/cache/save@v4
         if: always()
         with:
           path: data/usage.json
           key: usage-${{ steps.usage.outputs.day }}-${{ github.run_id }}
+      - name: Se relancer
+        if: ${{ !cancelled() }}   # annuler le run à la main arrête la boucle (variable LIVES=off aussi)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # Pas de live / passage très court : on attend un peu avant le suivant (15 min minimum entre deux départs).
+          left=$(( T0 + 900 - $(date +%s) ))
+          if [ "$left" -gt 0 ]; then echo "Pause de $left s"; sleep "$left"; fi
+          gh workflow run lives.yml --ref "${{ github.ref_name }}" \
+            -f top="${LIVE_TOP}" -f fenetre="${LIVE_WINDOW_MIN}" -f enregistrement="${LIVE_RECORD_MIN}"
