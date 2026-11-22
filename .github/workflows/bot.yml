@@ -5,8 +5,9 @@ on:
   # Toutes les 20 minutes, GitHub regarde la programmation réglée sur le site.
   # Si elle est arrêtée (réglage par défaut), le contrôle s'arrête en quelques secondes
   # sans rien lancer.
-  schedule:
-    - cron: "*/20 * * * *"
+  # PAUSE du 22/11 (demande : « mets le clipping sur pause indéfiniment ») :
+  # schedule:
+  #   - cron: "*/20 * * * *"
   workflow_dispatch:       # bouton « Lancer » du site, ou « Run workflow » sur GitHub
     inputs:
       jeu:

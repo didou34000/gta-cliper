@@ -3,8 +3,9 @@
 # Ne publie rien tant que BUFFER_API_KEY n'est pas configurée sur Vercel.
 name: Publication Buffer
 on:
-  schedule:
-    - cron: "*/20 * * * *"
+  # PAUSE du 22/11 (demande : « mets le clipping sur pause indéfiniment ») :
+  # schedule:
+  #   - cron: "*/20 * * * *"
   workflow_dispatch:
 permissions:
   contents: read

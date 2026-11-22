@@ -3,8 +3,9 @@
 # Toutes les heures (à :45), ou à la main : Actions > Lives > Run workflow.
 name: Lives
 on:
-  schedule:
-    - cron: "45 * * * *"
+  # PAUSE du 22/11 (demande : « mets le clipping sur pause indéfiniment ») :
+  # schedule:
+  #   - cron: "45 * * * *"
   workflow_dispatch:
     inputs:
       top:
@@ -102,7 +103,7 @@ jobs:
           path: data/usage.json
           key: usage-${{ steps.usage.outputs.day }}-${{ github.run_id }}
       - name: Se relancer
-        if: ${{ !cancelled() }}   # annuler le run à la main arrête la boucle (variable LIVES=off aussi)
+        if: ${{ false }}  # PAUSE du 22/11 : ne se relance plus (remettre !cancelled() pour reprendre)   # annuler le run à la main arrête la boucle (variable LIVES=off aussi)
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
