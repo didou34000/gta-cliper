@@ -7,8 +7,9 @@
 # Dépôt public : minutes GitHub Actions gratuites et illimitées.
 name: Moteur (contrôle toutes les 10 min)
 on:
-  schedule:
-    - cron: "7 */2 * * *"
+  # PAUSE du 22/11 (demande : « mets le clipping sur pause indéfiniment ») :
+  # schedule:
+  #   - cron: "7 */2 * * *"
   workflow_dispatch:
 
 permissions:
@@ -56,5 +57,5 @@ jobs:
             sleep 600
           done
       - name: Se relancer
-        if: ${{ !cancelled() }}   # annuler le run à la main l'arrête (le cron le redémarre dans les 2 h)
+        if: ${{ false }}  # PAUSE du 22/11 : ne se relance plus (remettre !cancelled() pour reprendre)   # annuler le run à la main l'arrête (le cron le redémarre dans les 2 h)
         run: gh workflow run heartbeat.yml --ref "${{ github.ref_name }}"
